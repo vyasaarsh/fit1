@@ -44,33 +44,33 @@ export default function TrainingPage() {
   ])
 
   return (
-    <div className="container mx-auto px-4 py-6">
+    <div className="container mx-auto px-4 py-6 bg-black min-h-screen text-white">
       <header className="mb-8">
-        <h1 className="text-2xl font-bold">Training</h1>
-        <p className="text-gray-400">Choose an exercise to begin your workout</p>
+        <h1 className="text-2xl font-bold text-white">Training</h1>
+        <p className="text-red-300">Choose an exercise to begin your workout</p>
       </header>
 
       <section className="mb-8">
-        <h2 className="mb-4 text-lg font-semibold">Featured Exercises</h2>
+        <h2 className="mb-4 text-lg font-semibold text-white">Featured Exercises</h2>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {featuredExercises.map((exercise) => (
             <Link href={`/dashboard/exercise/${exercise.id}`} key={exercise.id}>
               <motion.div
                 whileHover={{ scale: 1.03 }}
                 whileTap={{ scale: 0.98 }}
-                className="relative overflow-hidden rounded-xl bg-gradient-to-br from-gray-800 to-gray-900 p-5"
+                className="relative overflow-hidden rounded-xl bg-gradient-to-br from-zinc-900 to-red-900 p-5 shadow-md"
               >
                 <div className="mb-4 flex items-center justify-between">
                   <span className="text-2xl">{exercise.icon}</span>
-                  <span className="rounded-full bg-emerald-500/20 px-2 py-1 text-xs text-emerald-500">
+                  <span className="rounded-full bg-red-500/20 px-2 py-1 text-xs text-red-500 capitalize">
                     {exercise.level}
                   </span>
                 </div>
-                <h3 className="mb-1 text-lg font-medium">{exercise.name}</h3>
-                <p className="mb-4 text-sm text-gray-400">{exercise.target}</p>
+                <h3 className="mb-1 text-lg font-medium text-white">{exercise.name}</h3>
+                <p className="mb-4 text-sm text-red-200">{exercise.target}</p>
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-400">{exercise.duration}</span>
-                  <ArrowRight className="h-4 w-4 text-emerald-500" />
+                  <span className="text-sm text-red-300">{exercise.duration}</span>
+                  <ArrowRight className="h-4 w-4 text-red-500" />
                 </div>
               </motion.div>
             </Link>
@@ -79,13 +79,22 @@ export default function TrainingPage() {
       </section>
 
       <section>
-        <h2 className="mb-4 text-lg font-semibold">Training Programs</h2>
-        <div className="rounded-xl bg-gradient-to-r from-emerald-500/20 to-emerald-700/20 p-5">
+        <h2 className="mb-4 text-lg font-semibold text-white">Training Programs</h2>
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="rounded-xl bg-gradient-to-r from-zinc-900 to-red-800 p-5"
+        >
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="mb-1 text-lg font-medium">7-Day Challenge</h3>
-              <p className="text-sm text-gray-400">Complete daily exercises for a full week</p>
-              <button className="mt-4 rounded-lg bg-emerald-500 px-4 py-2 text-sm font-medium">Coming Soon</button>
+              <h3 className="mb-1 text-lg font-medium text-white">7-Day Challenge</h3>
+              <p className="text-sm text-red-200">
+                Complete daily exercises for a full week
+              </p>
+              <button className="mt-4 rounded-lg bg-red-600 hover:bg-red-700 text-white px-4 py-2 text-sm font-medium transition">
+                Coming Soon
+              </button>
             </div>
             <div className="hidden md:block">
               <Image
@@ -97,7 +106,7 @@ export default function TrainingPage() {
               />
             </div>
           </div>
-        </div>
+        </motion.div>
       </section>
     </div>
   )
