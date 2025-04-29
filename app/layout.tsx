@@ -22,8 +22,8 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false} disableTransitionOnChange>
-          <ThemeToggle />
           <div className="min-h-screen">
+            <ThemeToggle />
             {children}
           </div>
         </ThemeProvider>
