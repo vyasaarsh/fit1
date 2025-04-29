@@ -1,41 +1,26 @@
-// components/theme-toggle.tsx
-"use client"
+'use client'
 
-import { MoonIcon, SunIcon } from "@radix-ui/react-icons"
-import { useTheme } from "next-themes"
-import { Button } from "@/components/ui/button"
-import { useEffect, useState } from "react"
+import { useTheme } from 'next-themes'
+import { useEffect, useState } from 'react'
+import { Moon, Sun } from 'lucide-react'
 
-export function ThemeToggle() {
-  const [mounted, setMounted] = useState(false)
+export default function ThemeToggle() {
   const { theme, setTheme } = useTheme()
+  const [mounted, setMounted] = useState(false)
 
-  // useEffect only runs on the client, so now we can safely show the UI
   useEffect(() => {
     setMounted(true)
   }, [])
 
-  if (!mounted) {
-    return (
-      <Button variant="ghost" size="icon" className="absolute right-4 top-4" disabled>
-        <div className="h-5 w-5" />
-      </Button>
-    )
-  }
+  if (!mounted) return null
 
   return (
-    <Button
-      variant="ghost"
-      size="icon"
-      onClick={() => setTheme(theme === "light" ? "dark" : "light")}
-      className="absolute right-4 top-4"
+    <button
+      onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+      className="fixed top-4 right-4 z-50 p-2 rounded-full bg-muted text-foreground hover:bg-muted/80 transition"
+      aria-label="Toggle theme"
     >
-      {theme === "dark" ? (
-        <SunIcon className="h-5 w-5" />
-      ) : (
-        <MoonIcon className="h-5 w-5" />
-      )}
-      <span className="sr-only">Toggle theme</span>
-    </Button>
+      {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
+    </button>
   )
 }
