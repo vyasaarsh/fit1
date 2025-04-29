@@ -8,7 +8,7 @@ export default function Home() {
       <div className="mb-8 flex items-center justify-center">
         <FitnessCenterIcon className="h-16 w-16 text-emerald-500" />
       </div>
-      <h1 className="mb-4 text-4xl font-bold tracking-tight">FitTrack</h1>
+      <h1 className="mb-4 text-4xl font-bold tracking-tight">NuitriFitFuel</h1>
       <p className="mb-8 max-w-md text-gray-400">
         Train smarter with AI-powered pose detection to perfect your form and track your progress.
       </p>
