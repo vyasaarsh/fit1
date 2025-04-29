@@ -5,7 +5,7 @@ export default function Home() {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center p-6 text-center bg-black text-white">
       <div className="mb-8 flex items-center justify-center">
-        <img src="/logo.png" alt="NuitriFitFuel Logo" className="max-w-[120px] w-full h-auto" />
+        <img src="/nfflogo.png" alt="NuitriFitFuel Logo" className="max-w-[120px] w-full h-auto" />
       </div>
       <h1 className="mb-4 text-4xl font-bold tracking-tight">NuitriFitFuel</h1>
       <p className="mb-8 max-w-md text-gray-400">
