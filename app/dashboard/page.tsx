@@ -4,101 +4,129 @@ import { useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { motion } from "framer-motion"
-import { ArrowRight } from "lucide-react"
-
-type Exercise = {
-  id: string
-  name: string
-  target: string
-  icon: string
-  duration: string
-  level: "beginner" | "intermediate" | "advanced"
-}
+import { ArrowRight, Plus } from "lucide-react"
 
 export default function TrainingPage() {
-  const [featuredExercises] = useState<Exercise[]>([
-    {
-      id: "squats",
-      name: "Squats",
-      target: "Lower Body",
-      icon: "🦵",
-      duration: "3 min",
-      level: "beginner",
-    },
-    {
-      id: "pushups",
-      name: "Push Ups",
-      target: "Upper Body",
-      icon: "💪",
-      duration: "2 min",
-      level: "intermediate",
-    },
-    {
-      id: "planks",
-      name: "Planks",
-      target: "Core",
-      icon: "🧘‍♂️",
-      duration: "1 min",
-      level: "beginner",
-    },
-  ])
+  const [activeTab, setActiveTab] = useState("forYou")
 
   return (
-    <div className="container mx-auto px-4 py-6">
+    <div className="container mx-auto px-4 py-6 bg-black text-white">
+      {/* Welcome Header */}
       <header className="mb-8">
-        <h1 className="text-2xl font-bold">Training</h1>
-        <p className="text-gray-400">Choose an exercise to begin your workout</p>
+        <h1 className="text-3xl font-bold mb-2 text-red-500">WELCOME TO NUTRIFITFUEL</h1>
+        <p className="text-gray-300">The fastest workout in the world is awaiting you. Come try it out!</p>
       </header>
 
-      <section className="mb-8">
-        <h2 className="mb-4 text-lg font-semibold">Featured Exercises</h2>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {featuredExercises.map((exercise) => (
-            <Link href={`/dashboard/exercise/${exercise.id}`} key={exercise.id}>
-              <motion.div
-                whileHover={{ scale: 1.03 }}
-                whileTap={{ scale: 0.98 }}
-                className="relative overflow-hidden rounded-xl bg-gradient-to-br from-gray-800 to-gray-900 p-5"
-              >
-                <div className="mb-4 flex items-center justify-between">
-                  <span className="text-2xl">{exercise.icon}</span>
-                  <span className="rounded-full bg-emerald-500/20 px-2 py-1 text-xs text-emerald-500">
-                    {exercise.level}
-                  </span>
-                </div>
-                <h3 className="mb-1 text-lg font-medium">{exercise.name}</h3>
-                <p className="mb-4 text-sm text-gray-400">{exercise.target}</p>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-400">{exercise.duration}</span>
-                  <ArrowRight className="h-4 w-4 text-emerald-500" />
-                </div>
-              </motion.div>
-            </Link>
-          ))}
-        </div>
-      </section>
+      {/* Navigation Tabs */}
+      <div className="flex border-b border-gray-800 mb-6">
+        <button
+          onClick={() => setActiveTab("forYou")}
+          className={`px-4 py-2 font-medium ${activeTab === "forYou" ? "text-red-500 border-b-2 border-red-500" : "text-gray-400"}`}
+        >
+          For You
+        </button>
+        <button
+          onClick={() => setActiveTab("challenges")}
+          className={`px-4 py-2 font-medium ${activeTab === "challenges" ? "text-red-500 border-b-2 border-red-500" : "text-gray-400"}`}
+        >
+          Challenges
+        </button>
+        <button
+          onClick={() => setActiveTab("sessions")}
+          className={`px-4 py-2 font-medium ${activeTab === "sessions" ? "text-red-500 border-b-2 border-red-500" : "text-gray-400"}`}
+        >
+          Workout Sessions
+        </button>
+      </div>
 
-      <section>
-        <h2 className="mb-4 text-lg font-semibold">Training Programs</h2>
-        <div className="rounded-xl bg-gradient-to-r from-emerald-500/20 to-emerald-700/20 p-5">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="mb-1 text-lg font-medium">7-Day Challenge</h3>
-              <p className="text-sm text-gray-400">Complete daily exercises for a full week</p>
-              <button className="mt-4 rounded-lg bg-emerald-500 px-4 py-2 text-sm font-medium">Coming Soon</button>
-            </div>
-            <div className="hidden md:block">
-              <Image
-                src="/placeholder.svg?height=80&width=80"
-                alt="7-day challenge"
-                width={80}
-                height={80}
-                className="rounded-lg"
-              />
-            </div>
-          </div>
-        </div>
-      </section>
+      {/* Tab Content */}
+      <div className="space-y-8">
+        {activeTab === "forYou" && (
+          <>
+            <section className="space-y-4">
+              <h2 className="text-xl font-semibold">For You</h2>
+              <div className="grid grid-cols-3 gap-4 text-center">
+                <Link href="#" className="p-4 rounded-lg bg-gray-900 hover:bg-gray-800 transition-colors">
+                  <div className="text-red-500 font-medium">Sessions</div>
+                </Link>
+                <Link href="#" className="p-4 rounded-lg bg-gray-900 hover:bg-gray-800 transition-colors">
+                  <div className="text-red-500 font-medium">Challenges</div>
+                </Link>
+                <Link href="#" className="p-4 rounded-lg bg-gray-900 hover:bg-gray-800 transition-colors">
+                  <div className="text-red-500 font-medium">Your workouts</div>
+                </Link>
+              </div>
+            </section>
+
+            <section className="space-y-4">
+              <div className="flex items-center gap-2">
+                <span className="text-2xl">💬</span>
+                <h2 className="text-xl font-semibold">Weekly challenge</h2>
+              </div>
+              <div className="p-4 rounded-lg bg-gray-900 border border-gray-800">
+                <h3 className="font-medium text-lg mb-2">Belgrade</h3>
+                <div className="flex justify-between text-gray-300">
+                  <span>Intermediate 7:00</span>
+                  <span>💬 Difficulty 💬 min</span>
+                </div>
+              </div>
+            </section>
+          </>
+        )}
+
+        {activeTab === "challenges" && (
+          <>
+            <section className="space-y-4">
+              <h2 className="text-xl font-semibold">Challenges</h2>
+              <p className="text-gray-300">Short and high intensity challenges. Compete with people from everywhere</p>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="p-4 rounded-lg bg-gray-900 border border-gray-800">
+                  <h3 className="font-medium text-lg">Kyiv</h3>
+                </div>
+                <div className="p-4 rounded-lg bg-gray-900 border border-gray-800">
+                  <h3 className="font-medium text-lg">Johannesburg</h3>
+                </div>
+              </div>
+            </section>
+
+            <section className="space-y-4">
+              <h2 className="text-xl font-semibold">Workout sessions</h2>
+              <p className="text-gray-300">Full workouts adapted to different objectives and designed by experts</p>
+            </section>
+          </>
+        )}
+
+        {activeTab === "sessions" && (
+          <>
+            <section className="space-y-4">
+              <h2 className="text-xl font-semibold">Workout sessions</h2>
+              <p className="text-gray-300">Full workouts adapted to different objectives and designed by experts</p>
+            </section>
+
+            <section className="space-y-4">
+              <h2 className="text-xl font-semibold">Your workouts</h2>
+              <p className="text-gray-300">Create a workout customized to your needs</p>
+              <button className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg transition-colors">
+                <Plus size={16} />
+                Create workout
+              </button>
+            </section>
+          </>
+        )}
+      </div>
+
+      {/* Bottom Navigation */}
+      <div className="fixed bottom-0 left-0 right-0 bg-gray-900 border-t border-gray-800 flex justify-around py-3">
+        <Link href="#" className="text-center text-gray-300 hover:text-red-500 transition-colors">
+          <div>The Club</div>
+        </Link>
+        <Link href="#" className="text-center text-red-500">
+          <div>Train</div>
+        </Link>
+        <Link href="#" className="text-center text-gray-300 hover:text-red-500 transition-colors">
+          <div>Profile</div>
+        </Link>
+      </div>
     </div>
   )
 }
