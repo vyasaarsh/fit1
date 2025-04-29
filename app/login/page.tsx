@@ -31,9 +31,7 @@ export default function LoginPage() {
           <Image
             src="/nfflogo.png"
             alt="NutriFitFuel Logo"
-            width={48}
-            height={48}
-            className="rounded-full"
+            className="max-w-[120px] w-full h-auto"
           />
           <h1 className="text-2xl font-bold">Log in to NutriFitFuel</h1>
           <p className="text-sm text-gray-400">
