@@ -44,33 +44,72 @@ export default function TrainingPage() {
   ])
 
   return (
-    <div className="container mx-auto px-4 py-6 bg-black min-h-screen text-white">
+    <motion.div 
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.5 }}
+      className="container mx-auto px-4 py-6 bg-black text-white"
+    >
       <header className="mb-8">
-        <h1 className="text-2xl font-bold text-white">Training</h1>
-        <p className="text-red-300">Choose an exercise to begin your workout</p>
+        <motion.h1 
+          initial={{ y: -20 }}
+          animate={{ y: 0 }}
+          className="text-2xl font-bold text-red-500"
+        >
+          Training
+        </motion.h1>
+        <motion.p 
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.1 }}
+          className="text-gray-400"
+        >
+          Choose an exercise to begin your workout
+        </motion.p>
       </header>
 
       <section className="mb-8">
-        <h2 className="mb-4 text-lg font-semibold text-white">Featured Exercises</h2>
+        <motion.h2 
+          initial={{ x: -20 }}
+          animate={{ x: 0 }}
+          transition={{ delay: 0.2 }}
+          className="mb-4 text-lg font-semibold text-red-500"
+        >
+          Featured Exercises
+        </motion.h2>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {featuredExercises.map((exercise) => (
+          {featuredExercises.map((exercise, index) => (
             <Link href={`/dashboard/exercise/${exercise.id}`} key={exercise.id}>
               <motion.div
-                whileHover={{ scale: 1.03 }}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3 + index * 0.1 }}
+                whileHover={{ 
+                  scale: 1.03,
+                  boxShadow: "0 10px 25px -5px rgba(239, 68, 68, 0.2)"
+                }}
                 whileTap={{ scale: 0.98 }}
-                className="relative overflow-hidden rounded-xl bg-gradient-to-br from-zinc-900 to-red-900 p-5 shadow-md"
+                className="relative overflow-hidden rounded-xl bg-gradient-to-br from-gray-900 to-gray-800 p-5 border border-gray-800"
               >
                 <div className="mb-4 flex items-center justify-between">
                   <span className="text-2xl">{exercise.icon}</span>
-                  <span className="rounded-full bg-red-500/20 px-2 py-1 text-xs text-red-500 capitalize">
+                  <span className={`rounded-full px-2 py-1 text-xs ${
+                    exercise.level === "beginner" 
+                      ? "bg-red-500/20 text-red-400" 
+                      : exercise.level === "intermediate" 
+                        ? "bg-red-600/20 text-red-500" 
+                        : "bg-red-700/20 text-red-600"
+                  }`}>
                     {exercise.level}
                   </span>
                 </div>
-                <h3 className="mb-1 text-lg font-medium text-white">{exercise.name}</h3>
-                <p className="mb-4 text-sm text-red-200">{exercise.target}</p>
+                <h3 className="mb-1 text-lg font-medium">{exercise.name}</h3>
+                <p className="mb-4 text-sm text-gray-400">{exercise.target}</p>
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-red-300">{exercise.duration}</span>
-                  <ArrowRight className="h-4 w-4 text-red-500" />
+                  <span className="text-sm text-gray-400">{exercise.duration}</span>
+                  <motion.div whileHover={{ x: 3 }}>
+                    <ArrowRight className="h-4 w-4 text-red-500" />
+                  </motion.div>
                 </div>
               </motion.div>
             </Link>
@@ -79,22 +118,34 @@ export default function TrainingPage() {
       </section>
 
       <section>
-        <h2 className="mb-4 text-lg font-semibold text-white">Training Programs</h2>
+        <motion.h2 
+          initial={{ x: -20 }}
+          animate={{ x: 0 }}
+          transition={{ delay: 0.5 }}
+          className="mb-4 text-lg font-semibold text-red-500"
+        >
+          Training Programs
+        </motion.h2>
         <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="rounded-xl bg-gradient-to-r from-zinc-900 to-red-800 p-5"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.6 }}
+          whileHover={{ 
+            boxShadow: "0 10px 25px -5px rgba(239, 68, 68, 0.3)"
+          }}
+          className="rounded-xl bg-gradient-to-r from-red-900/30 to-red-800/30 p-5 border border-gray-800"
         >
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="mb-1 text-lg font-medium text-white">7-Day Challenge</h3>
-              <p className="text-sm text-red-200">
-                Complete daily exercises for a full week
-              </p>
-              <button className="mt-4 rounded-lg bg-red-600 hover:bg-red-700 text-white px-4 py-2 text-sm font-medium transition">
+              <h3 className="mb-1 text-lg font-medium">7-Day Challenge</h3>
+              <p className="text-sm text-gray-400">Complete daily exercises for a full week</p>
+              <motion.button 
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className="mt-4 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium hover:bg-red-700 transition-colors"
+              >
                 Coming Soon
-              </button>
+              </motion.button>
             </div>
             <div className="hidden md:block">
               <Image
@@ -108,6 +159,6 @@ export default function TrainingPage() {
           </div>
         </motion.div>
       </section>
-    </div>
+    </motion.div>
   )
 }
