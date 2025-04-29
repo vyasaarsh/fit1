@@ -1,9 +1,12 @@
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
+import Image from "next/image"
+import { ThemeToggle } from "@/components/theme-toggle"
 
 export default function Home() {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center p-6 text-center bg-black text-white">
+      <ThemeToggle />
       <div className="mb-8 flex items-center justify-center">
         <img src="/nfflogo.png" alt="NuitriFitFuel Logo" className="max-w-[120px] w-full h-auto" />
       </div>
