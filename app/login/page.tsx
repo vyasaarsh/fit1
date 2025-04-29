@@ -3,12 +3,12 @@
 import * as React from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
+import Image from "next/image"
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { NutriFitFuelLogo } from "@/components/icons/nutrifitfuel-logo"
 
 export default function LoginPage() {
   const router = useRouter()
@@ -28,7 +28,13 @@ export default function LoginPage() {
     <div className="flex min-h-screen flex-col items-center justify-center p-6 bg-black text-white">
       <div className="mx-auto flex w-full max-w-md flex-col space-y-6">
         <div className="flex flex-col items-center space-y-2 text-center">
-          <NutriFitFuelLogo className="h-12 w-12 text-red-600" />
+          <Image
+            src="/nfflogo.png"
+            alt="NutriFitFuel Logo"
+            width={48}
+            height={48}
+            className="rounded-full"
+          />
           <h1 className="text-2xl font-bold">Log in to NutriFitFuel</h1>
           <p className="text-sm text-gray-400">
             Enter your email and password to access your account.
