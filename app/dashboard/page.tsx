@@ -54,7 +54,7 @@ export default function TrainingPage() {
         <h2 className="mb-4 text-lg font-semibold">Featured Exercises</h2>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {featuredExercises.map((exercise) => (
-            <Link href={/dashboard/exercise/${exercise.id}} key={exercise.id}>
+            <Link href={`/dashboard/exercise/${exercise.id}`} key={exercise.id}>
               <motion.div
                 whileHover={{ scale: 1.03 }}
                 whileTap={{ scale: 0.98 }}
