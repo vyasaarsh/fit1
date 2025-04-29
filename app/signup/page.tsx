@@ -1,15 +1,14 @@
 "use client"
 
-import type React from "react"
-
 import { useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import { motion } from "framer-motion"
+import Image from "next/image"
+
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { FitnessCenterIcon } from "@/components/icons/fitness-center"
-import { motion } from "framer-motion"
 
 export default function SignupPage() {
   const [isLoading, setIsLoading] = useState(false)
@@ -19,7 +18,7 @@ export default function SignupPage() {
     e.preventDefault()
     setIsLoading(true)
 
-    // Simulate API call for account creation
+    // Simulate API call
     setTimeout(() => {
       setIsLoading(false)
       router.push("/dashboard")
@@ -27,7 +26,7 @@ export default function SignupPage() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center p-6">
+    <div className="flex min-h-screen flex-col items-center justify-center bg-black px-6 py-10 text-white">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -35,51 +34,67 @@ export default function SignupPage() {
         className="w-full max-w-md space-y-8"
       >
         <div className="flex flex-col items-center text-center">
-          <Link href="/" className="mb-6 flex items-center">
-            <FitnessCenterIcon className="h-12 w-12 text-emerald-500" />
-          </Link>
+          <Image
+            src="/nfflogo.png"
+            alt="NutriFitFuel Logo"
+            className="max-w-[120px] w-full h-auto"
+          />
           <h1 className="text-3xl font-bold">Create your account</h1>
-          <p className="mt-2 text-sm text-gray-400">Join the FitTrack community and start your fitness journey</p>
+          <p className="mt-2 text-sm text-gray-400">
+            Join NutriFitFuel and start your wellness journey
+          </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="space-y-2">
-            <Label htmlFor="name">Full Name</Label>
-            <Input id="name" placeholder="John Doe" required className="bg-gray-800/50 border-gray-700" />
+            <Label htmlFor="name" className="text-white">Full Name</Label>
+            <Input
+              id="name"
+              placeholder="John Doe"
+              required
+              className="bg-neutral-900 border border-red-600 text-white"
+            />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
+            <Label htmlFor="email" className="text-white">Email</Label>
             <Input
               id="email"
               type="email"
               placeholder="john@example.com"
               required
-              className="bg-gray-800/50 border-gray-700"
+              className="bg-neutral-900 border border-red-600 text-white"
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
-            <Input id="password" type="password" required className="bg-gray-800/50 border-gray-700" />
+            <Label htmlFor="password" className="text-white">Password</Label>
+            <Input
+              id="password"
+              type="password"
+              required
+              className="bg-neutral-900 border border-red-600 text-white"
+            />
           </div>
 
-          <Button type="submit" className="w-full bg-emerald-500 hover:bg-emerald-600" disabled={isLoading}>
+          <Button
+            type="submit"
+            className="w-full bg-red-600 hover:bg-red-700"
+            disabled={isLoading}
+          >
             {isLoading ? (
-              <span className="inline-block h-5 w-5 animate-spin rounded-full border-2 border-solid border-current border-r-transparent" />
+              <span className="inline-block h-5 w-5 animate-spin rounded-full border-2 border-white border-r-transparent" />
             ) : (
               "Sign Up"
             )}
           </Button>
         </form>
 
-        <div className="mt-6 text-center text-sm">
-          <p className="text-gray-400">
-            Already have an account?{" "}
-            <Link href="/login" className="text-emerald-500 hover:underline">
-              Login
-            </Link>
-          </p>
+        <div className="mt-6 text-center text-sm text-gray-400">
+          Already have an account?{" "}
+          <Link href="/login" className="text-red-500 hover:underline">
+            Login
+          </Link>
         </div>
       </motion.div>
     </div>
