@@ -23,7 +23,7 @@ export default function RootLayout({
       <body className={inter.className}>
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false} disableTransitionOnChange>
           <ThemeToggle />
-          <div className="min-h-screen bg-gradient-to-br from-gray-950 to-gray-900 text-white">
+          <div className="min-h-screen bg-white text-black dark:bg-gradient-to-br dark:from-gray-950 dark:to-gray-900 dark:text-white">
             {children}
           </div>
         </ThemeProvider>
