@@ -2,7 +2,7 @@
 import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { motion } from "framer-motion"
-import { ArrowLeft, Play } from "lucide-react"
+import { ArrowLeft, Play, Clock, Target, BarChart3 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
 type ExerciseInfo = {
@@ -13,6 +13,8 @@ type ExerciseInfo = {
   difficulty: string
   imageUrl: string
   gifUrl: string
+  instructions: string[]
+  benefits: string[]
 }
 
 const exerciseData: Record<string, ExerciseInfo> = {
@@ -24,6 +26,20 @@ const exerciseData: Record<string, ExerciseInfo> = {
     difficulty: "Beginner",
     imageUrl: "/placeholder.svg?height=300&width=400",
     gifUrl: "/placeholder.svg?height=400&width=300",
+    instructions: [
+      "Stand with feet shoulder-width apart",
+      "Keep your back straight and chest up",
+      "Lower your body as if sitting in a chair",
+      "Keep knees in line with toes",
+      "Lower until thighs are parallel to the ground",
+      "Push through heels to return to starting position",
+    ],
+    benefits: [
+      "Builds lower body strength",
+      "Improves mobility and balance",
+      "Increases core stability",
+      "Burns calories efficiently",
+    ],
   },
   pushups: {
     id: "pushups",
@@ -33,6 +49,20 @@ const exerciseData: Record<string, ExerciseInfo> = {
     difficulty: "Intermediate",
     imageUrl: "/placeholder.svg?height=300&width=400",
     gifUrl: "/placeholder.svg?height=400&width=300",
+    instructions: [
+      "Start in a plank position with hands slightly wider than shoulders",
+      "Keep your body in a straight line from head to heels",
+      "Lower your body until your chest nearly touches the floor",
+      "Keep elbows at a 45-degree angle from your body",
+      "Push back up to the starting position",
+      "Keep core engaged throughout the movement",
+    ],
+    benefits: [
+      "Builds upper body strength",
+      "Improves core stability",
+      "Enhances shoulder mobility",
+      "Can be done anywhere with no equipment",
+    ],
   },
   planks: {
     id: "planks",
@@ -43,6 +73,20 @@ const exerciseData: Record<string, ExerciseInfo> = {
     difficulty: "Beginner",
     imageUrl: "/placeholder.svg?height=300&width=400",
     gifUrl: "/placeholder.svg?height=400&width=300",
+    instructions: [
+      "Start in a forearm plank position",
+      "Place forearms on the ground with elbows under shoulders",
+      "Extend legs behind you with toes tucked",
+      "Create a straight line from head to heels",
+      "Engage your core and glutes",
+      "Hold the position while breathing normally",
+    ],
+    benefits: [
+      "Strengthens core muscles",
+      "Improves posture",
+      "Reduces lower back pain",
+      "Increases overall stability",
+    ],
   },
 }
 
@@ -67,7 +111,7 @@ export default function ExerciseDetailPage({ params }: { params: { id: string } 
         <h1 className="text-2xl font-bold">{exercise.name}</h1>
       </header>
 
-      <div className="mb-8 rounded-xl bg-gray-800/50 overflow-hidden">
+      <div className="mb-8 rounded-xl overflow-hidden bg-gray-800/50 relative">
         <Image
           src={exercise.imageUrl || "/placeholder.svg"}
           alt={exercise.name}
@@ -77,9 +121,39 @@ export default function ExerciseDetailPage({ params }: { params: { id: string } 
         />
       </div>
 
+      {/* Exercise Info Cards */}
+      <div className="grid grid-cols-3 gap-3 mb-6">
+        <div className="flex flex-col items-center justify-center rounded-lg bg-gray-800/50 p-3">
+          <Clock className="h-5 w-5 text-emerald-500 mb-1" />
+          <span className="text-xs text-gray-400">Duration</span>
+          <span className="font-medium">3-5 min</span>
+        </div>
+        <div className="flex flex-col items-center justify-center rounded-lg bg-gray-800/50 p-3">
+          <Target className="h-5 w-5 text-emerald-500 mb-1" />
+          <span className="text-xs text-gray-400">Target</span>
+          <span className="font-medium">{exercise.targetMuscles[0]}</span>
+        </div>
+        <div className="flex flex-col items-center justify-center rounded-lg bg-gray-800/50 p-3">
+          <BarChart3 className="h-5 w-5 text-emerald-500 mb-1" />
+          <span className="text-xs text-gray-400">Level</span>
+          <span className="font-medium">{exercise.difficulty}</span>
+        </div>
+      </div>
+
       <div className="mb-6">
         <h2 className="mb-2 text-lg font-semibold">Description</h2>
         <p className="text-gray-400">{exercise.description}</p>
+      </div>
+
+      <div className="mb-6">
+        <h2 className="mb-2 text-lg font-semibold">Instructions</h2>
+        <ul className="list-disc pl-5 space-y-1">
+          {exercise.instructions.map((instruction, index) => (
+            <li key={index} className="text-gray-400">
+              {instruction}
+            </li>
+          ))}
+        </ul>
       </div>
 
       <div className="mb-6">
@@ -93,11 +167,15 @@ export default function ExerciseDetailPage({ params }: { params: { id: string } 
         </div>
       </div>
 
-      <div className="mb-10">
-        <h2 className="mb-2 text-lg font-semibold">Difficulty</h2>
-        <span className="inline-block rounded-full bg-emerald-500/20 px-3 py-1 text-sm text-emerald-500">
-          {exercise.difficulty}
-        </span>
+      <div className="mb-6">
+        <h2 className="mb-2 text-lg font-semibold">Benefits</h2>
+        <ul className="list-disc pl-5 space-y-1">
+          {exercise.benefits.map((benefit, index) => (
+            <li key={index} className="text-gray-400">
+              {benefit}
+            </li>
+          ))}
+        </ul>
       </div>
 
       <motion.div initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.2 }}>
