@@ -1,9 +1,13 @@
 "use client"
 
+import type React from "react"
+
 import { useState } from "react"
-// Removed unsupported Next.js imports
+import Image from "next/image"
+import Link from "next/link"
 import { motion } from "framer-motion"
-import { ArrowRight, Clock, Filter } from "lucide-react"
+import { ArrowRight, Dumbbell, Calendar, Trophy, FolderPlus } from "lucide-react"
+import { cn } from "@/lib/utils"
 
 type Exercise = {
   id: string
@@ -12,21 +16,48 @@ type Exercise = {
   icon: string
   duration: string
   level: "beginner" | "intermediate" | "advanced"
+  description: string
+  imageUrl: string
 }
 
-type Session = {
-  id: string
-  name: string
-  category: string
-  goal: string
-  duration: string
-  difficulty: number
-  image: string
-  isPro?: boolean
-}
+type TabType = "sessions" | "challenges" | "for-you" | "your-workouts"
 
 export default function TrainingPage() {
-  const [activeTab, setActiveTab] = useState<string>("sessions")
+  const [activeTab, setActiveTab] = useState<TabType>("sessions")
+
+  const [exercises] = useState<Exercise[]>([
+    {
+      id: "squats",
+      name: "Squats",
+      target: "Lower Body",
+      icon: "🦵",
+      duration: "3 min",
+      level: "beginner",
+      description: "A compound exercise that works multiple muscle groups in your lower body.",
+      imageUrl: "/placeholder.svg?height=200&width=300",
+    },
+    {
+      id: "pushups",
+      name: "Push Ups",
+      target: "Upper Body",
+      icon: "💪",
+      duration: "2 min",
+      level: "intermediate",
+      description: "A classic bodyweight exercise that strengthens your chest, shoulders, and arms.",
+      imageUrl: "/placeholder.svg?height=200&width=300",
+    },
+    {
+      id: "planks",
+      name: "Planks",
+      target: "Core",
+      icon: "🧘‍♂️",
+      duration: "1 min",
+      level: "beginner",
+      description: "An isometric core strength exercise that involves maintaining a position similar to a push-up.",
+      imageUrl: "/placeholder.svg?height=200&width=300",
+    },
+  ])
+
   const [challenges] = useState<Exercise[]>([
     {
       id: "belgrade",
@@ -35,6 +66,8 @@ export default function TrainingPage() {
       icon: "🏋️",
       duration: "7 min",
       level: "intermediate",
+      description: "A challenging full body workout inspired by Eastern European training methods.",
+      imageUrl: "/placeholder.svg?height=200&width=300",
     },
     {
       id: "kyiv",
@@ -43,6 +76,8 @@ export default function TrainingPage() {
       icon: "🧘‍♂️",
       duration: "5 min",
       level: "beginner",
+      description: "Focus on your core with this beginner-friendly workout routine.",
+      imageUrl: "/placeholder.svg?height=200&width=300",
     },
     {
       id: "johannesburg",
@@ -51,219 +86,236 @@ export default function TrainingPage() {
       icon: "🦵",
       duration: "10 min",
       level: "advanced",
+      description: "An intense lower body workout that will push your limits.",
+      imageUrl: "/placeholder.svg?height=200&width=300",
     },
   ])
-
-  const [sessions] = useState<Session[]>([
-    {
-      id: "fat-burn",
-      name: "Fat burn addict",
-      category: "LOWER BODY",
-      goal: "Gain muscle",
-      duration: "35:00min",
-      difficulty: 3,
-      image: "/workout1.jpg",
-      isPro: true
-    },
-    {
-      id: "starting-sweater",
-      name: "Starting sweater",
-      category: "FULL BODY",
-      goal: "Get fit",
-      duration: "35:00min",
-      difficulty: 1,
-      image: "/workout2.jpg"
-    },
-    {
-      id: "beginner-intervals",
-      name: "Beginner intervals",
-      category: "FULL BODY",
-      goal: "Get fit",
-      duration: "30:00min",
-      difficulty: 1,
-      image: "/workout3.jpg"
-    },
-  ])
-
-  const renderTabContent = () => {
-    switch (activeTab) {
-      case "challenges":
-        return (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {challenges.map((challenge) => (
-              <div 
-                key={challenge.id}
-                onClick={() => window.location.href = `/dashboard/challenge/${challenge.id}`}
-                className="cursor-pointer"
-              >
-                <motion.div
-                  whileHover={{ scale: 1.03 }}
-                  whileTap={{ scale: 0.98 }}
-                  className="relative rounded-2xl bg-white shadow-md p-5"
-                >
-                  <div className="absolute top-4 left-4 bg-blue-600 text-white text-xs font-semibold px-2 py-1 rounded-full">
-                    Weekly Challenge
-                  </div>
-                  <div className="h-40 bg-gray-200 rounded-lg mb-4"></div>
-                  <h3 className="text-xl font-bold text-gray-900 mb-2">{challenge.name}</h3>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-500">{challenge.level}</span>
-                    <span className="text-sm text-gray-500">{challenge.duration}</span>
-                  </div>
-                </motion.div>
-              </div>
-            ))}
-          </div>
-        )
-      case "sessions":
-        return (
-          <div className="mt-4">
-            <div className="flex justify-end mb-4">
-              <button className="border border-gray-300 rounded-full px-4 py-2 flex items-center gap-2 text-gray-700">
-                <Filter className="h-5 w-5" />
-                <span className="font-medium">Filter</span>
-              </button>
-            </div>
-
-            <div className="space-y-6">
-              {sessions.map((session) => (
-                <div 
-                  key={session.id}
-                  onClick={() => window.location.href = `/dashboard/session/${session.id}`}
-                  className="cursor-pointer"
-                >
-                  <div className="flex bg-white rounded-2xl overflow-hidden shadow-md">
-                    <div className="relative w-1/3 h-48">
-                      <div className="bg-gray-200 h-full w-full">
-                        {/* Placeholder for actual images */}
-                        {session.isPro && (
-                          <div className="absolute bottom-4 left-4 bg-blue-600 text-white px-3 py-1 rounded-md font-bold">
-                            PRO
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    <div className="p-4 flex flex-col justify-between w-2/3">
-                      <div>
-                        <p className="text-gray-400 text-sm font-medium">{session.category}</p>
-                        <h3 className="text-xl font-bold text-gray-900 mb-2">{session.name}</h3>
-                        
-                        <div className="inline-block bg-blue-100 text-blue-600 rounded-full px-4 py-1 text-sm font-medium mb-3">
-                          {session.goal}
-                        </div>
-                      </div>
-                      
-                      <div className="flex justify-between items-center">
-                        <div className="flex items-center gap-1">
-                          <Clock className="h-4 w-4 text-blue-600" />
-                          <span className="text-blue-600 font-medium">{session.duration}</span>
-                        </div>
-                        
-                        <div className="flex gap-1">
-                          {[1, 2, 3].map((dot) => (
-                            <div 
-                              key={dot}
-                              className={`w-2 h-2 rounded-full ${dot <= session.difficulty ? 'bg-blue-600' : 'bg-gray-300'}`}
-                            />
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )
-      default:
-        return <div className="text-center py-10 text-gray-500">Coming soon</div>
-    }
-  }
 
   return (
-    <div className="container mx-auto px-4 py-6 bg-gray-50 min-h-screen">
+    <div className="container mx-auto px-4 py-6 min-h-screen">
       {/* Header */}
       <header className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-900">Training</h1>
-        <p className="text-gray-500 mt-1">Start your fitness journey today</p>
+        <h1 className="text-2xl font-bold">Training</h1>
+        <p className="text-gray-400 mt-1">Start your fitness journey today</p>
       </header>
 
       {/* Tabs */}
-      <div className="flex space-x-4 mb-6 border-b border-gray-200">
-        <button 
-          className={`pb-2 ${activeTab === "forYou" 
-            ? "text-blue-600 border-b-2 border-blue-600 font-semibold" 
-            : "text-gray-500"}`}
-          onClick={() => setActiveTab("forYou")}
-        >
+      <div className="flex space-x-4 mb-6 border-b border-gray-800 overflow-x-auto scrollbar-hide">
+        <TabButton active={activeTab === "for-you"} onClick={() => setActiveTab("for-you")}>
           For You
-        </button>
-        <button 
-          className={`pb-2 ${activeTab === "sessions" 
-            ? "text-blue-600 border-b-2 border-blue-600 font-semibold" 
-            : "text-gray-500"}`}
-          onClick={() => setActiveTab("sessions")}
-        >
+        </TabButton>
+        <TabButton active={activeTab === "sessions"} onClick={() => setActiveTab("sessions")}>
           Sessions
-        </button>
-        <button 
-          className={`pb-2 ${activeTab === "challenges" 
-            ? "text-blue-600 border-b-2 border-blue-600 font-semibold" 
-            : "text-gray-500"}`}
-          onClick={() => setActiveTab("challenges")}
-        >
+        </TabButton>
+        <TabButton active={activeTab === "challenges"} onClick={() => setActiveTab("challenges")}>
           Challenges
-        </button>
-        <button 
-          className={`pb-2 ${activeTab === "yourWorkouts" 
-            ? "text-blue-600 border-b-2 border-blue-600 font-semibold" 
-            : "text-gray-500"}`}
-          onClick={() => setActiveTab("yourWorkouts")}
-        >
+        </TabButton>
+        <TabButton active={activeTab === "your-workouts"} onClick={() => setActiveTab("your-workouts")}>
           Your Workouts
-        </button>
+        </TabButton>
       </div>
 
-      {/* Workout Sessions Card (only shown on first tab) */}
-      {activeTab === "forYou" && (
-        <section className="mb-6">
-          <div className="relative rounded-2xl bg-gradient-to-r from-blue-600 to-blue-400 text-white p-6 flex items-center">
-            <div className="flex-1">
-              <h2 className="text-2xl font-bold mb-2">Workout Sessions</h2>
-              <p className="text-sm mb-4">Full workouts adapted to different objectives and designed by experts</p>
-            </div>
-            <motion.button
-              whileHover={{ scale: 1.1 }}
-              className="bg-orange-500 rounded-full p-3"
-            >
-              <ArrowRight className="h-6 w-6 text-white" />
-            </motion.button>
-          </div>
-        </section>
-      )}
-
-      {/* Create Workout Card (only shown on first tab) */}
-      {activeTab === "forYou" && (
-        <section className="mb-6">
-          <div className="rounded-2xl bg-white shadow-md p-6 flex items-center">
-            <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mr-4">
-              <span className="text-2xl font-bold text-blue-600">A</span>
-            </div>
-            <div className="flex-1">
-              <h3 className="text-lg font-semibold text-gray-900">Your Workouts</h3>
-              <p className="text-2xl font-bold text-gray-900">Create a workout customized to your needs</p>
-            </div>
-            <button className="bg-orange-500 text-white rounded-full px-4 py-2 font-semibold">
-              Create Workout
-            </button>
-          </div>
-        </section>
-      )}
-
       {/* Tab Content */}
-      <section className="mb-6">
-        {renderTabContent()}
-      </section>
+      {activeTab === "sessions" && (
+        <>
+          {/* Exercise Sessions Card */}
+          <section className="mb-6">
+            <div className="relative rounded-xl bg-gradient-to-r from-emerald-700 to-emerald-500 text-white p-6 flex items-center">
+              <div className="flex-1">
+                <h2 className="text-2xl font-bold mb-2">Exercise Sessions</h2>
+                <p className="text-sm mb-4">Individual exercises with real-time form tracking and feedback</p>
+              </div>
+              <div className="hidden md:block">
+                <Dumbbell className="h-12 w-12 text-white/30" />
+              </div>
+            </div>
+          </section>
+
+          {/* Exercise List */}
+          <section className="mb-8">
+            <h2 className="text-lg font-semibold mb-4">Available Exercises</h2>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {exercises.map((exercise) => (
+                <Link href={`/dashboard/exercise/${exercise.id}`} key={exercise.id}>
+                  <motion.div
+                    whileHover={{ scale: 1.03 }}
+                    whileTap={{ scale: 0.98 }}
+                    className="relative overflow-hidden rounded-xl bg-gradient-to-br from-gray-800 to-gray-900 p-5 h-full"
+                  >
+                    <div className="mb-4 h-40 overflow-hidden rounded-lg bg-gray-700 relative">
+                      <Image
+                        src={exercise.imageUrl || "/placeholder.svg"}
+                        alt={exercise.name}
+                        fill
+                        className="object-cover"
+                      />
+                      <div className="absolute top-2 right-2 rounded-full bg-emerald-500/20 px-2 py-1 text-xs text-emerald-500">
+                        {exercise.level}
+                      </div>
+                    </div>
+                    <h3 className="mb-1 text-lg font-medium">{exercise.name}</h3>
+                    <p className="mb-3 text-sm text-gray-400">{exercise.target}</p>
+                    <p className="mb-4 text-xs text-gray-400 line-clamp-2">{exercise.description}</p>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-400">{exercise.duration}</span>
+                      <ArrowRight className="h-4 w-4 text-emerald-500" />
+                    </div>
+                  </motion.div>
+                </Link>
+              ))}
+            </div>
+          </section>
+
+          {/* How It Works Section */}
+          <section className="mb-6">
+            <h2 className="text-lg font-semibold mb-4">How It Works</h2>
+            <div className="rounded-xl bg-gray-800/50 p-6">
+              <div className="grid gap-6 md:grid-cols-3">
+                <div className="flex flex-col items-center text-center">
+                  <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-500">
+                    <span className="text-xl font-bold">1</span>
+                  </div>
+                  <h3 className="mb-2 font-medium">Select Exercise</h3>
+                  <p className="text-sm text-gray-400">
+                    Choose from our collection of exercises designed for different fitness levels
+                  </p>
+                </div>
+                <div className="flex flex-col items-center text-center">
+                  <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-500">
+                    <span className="text-xl font-bold">2</span>
+                  </div>
+                  <h3 className="mb-2 font-medium">Position Camera</h3>
+                  <p className="text-sm text-gray-400">Set up your device camera to track your movements accurately</p>
+                </div>
+                <div className="flex flex-col items-center text-center">
+                  <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-500">
+                    <span className="text-xl font-bold">3</span>
+                  </div>
+                  <h3 className="mb-2 font-medium">Get Feedback</h3>
+                  <p className="text-sm text-gray-400">
+                    Receive real-time feedback on your form and track your progress
+                  </p>
+                </div>
+              </div>
+            </div>
+          </section>
+        </>
+      )}
+
+      {activeTab === "challenges" && (
+        <>
+          {/* Challenges Header Card */}
+          <section className="mb-6">
+            <div className="relative rounded-xl bg-gradient-to-r from-emerald-700 to-emerald-500 text-white p-6 flex items-center">
+              <div className="flex-1">
+                <h2 className="text-2xl font-bold mb-2">Weekly Challenges</h2>
+                <p className="text-sm mb-4">Push yourself with our curated workout challenges</p>
+              </div>
+              <div className="hidden md:block">
+                <Trophy className="h-12 w-12 text-white/30" />
+              </div>
+            </div>
+          </section>
+
+          {/* Challenges Grid */}
+          <section className="mb-6">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {challenges.map((challenge) => (
+                <Link href={`/dashboard/challenge/${challenge.id}`} key={challenge.id}>
+                  <motion.div
+                    whileHover={{ scale: 1.03 }}
+                    whileTap={{ scale: 0.98 }}
+                    className="relative overflow-hidden rounded-xl bg-gradient-to-br from-gray-800 to-gray-900 p-5"
+                  >
+                    <div className="absolute top-4 left-4 bg-emerald-500 text-white text-xs font-semibold px-2 py-1 rounded-full">
+                      Weekly Challenge
+                    </div>
+                    <div className="h-40 bg-gray-700 rounded-lg mb-4 relative">
+                      <Image
+                        src={challenge.imageUrl || "/placeholder.svg"}
+                        alt={challenge.name}
+                        fill
+                        className="object-cover"
+                      />
+                    </div>
+                    <h3 className="text-xl font-bold mb-2">{challenge.name}</h3>
+                    <p className="mb-3 text-sm text-gray-400 line-clamp-2">{challenge.description}</p>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-400">{challenge.level}</span>
+                      <span className="text-sm text-gray-400">{challenge.duration}</span>
+                    </div>
+                  </motion.div>
+                </Link>
+              ))}
+            </div>
+          </section>
+        </>
+      )}
+
+      {activeTab === "for-you" && (
+        <div className="flex flex-col items-center justify-center py-12">
+          <div className="mb-6 flex justify-center">
+            <Calendar className="h-16 w-16 text-gray-400" />
+          </div>
+          <h2 className="mb-4 text-2xl font-bold">Personalized Workouts Coming Soon</h2>
+          <p className="mb-8 max-w-md text-center text-gray-400">
+            We're working on creating personalized workout recommendations based on your fitness level and goals.
+          </p>
+        </div>
+      )}
+
+      {activeTab === "your-workouts" && (
+        <>
+          {/* Create Workout Card */}
+          <section className="mb-6">
+            <div className="rounded-xl bg-gray-800/50 p-6 flex items-center">
+              <div className="w-12 h-12 bg-emerald-500/20 rounded-full flex items-center justify-center mr-4">
+                <FolderPlus className="h-6 w-6 text-emerald-500" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-lg font-semibold">Your Workouts</h3>
+                <p className="text-gray-400">Create a workout customized to your needs</p>
+              </div>
+              <button className="bg-emerald-500 text-white rounded-full px-4 py-2 font-semibold hover:bg-emerald-600">
+                Create Workout
+              </button>
+            </div>
+          </section>
+
+          <div className="flex flex-col items-center justify-center py-12">
+            <div className="mb-6 flex justify-center">
+              <FolderPlus className="h-16 w-16 text-gray-400" />
+            </div>
+            <h2 className="mb-4 text-2xl font-bold">No Custom Workouts Yet</h2>
+            <p className="mb-8 max-w-md text-center text-gray-400">
+              Create your first custom workout by clicking the "Create Workout" button above.
+            </p>
+          </div>
+        </>
+      )}
     </div>
+  )
+}
+
+// Tab Button Component
+function TabButton({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean
+  onClick: () => void
+  children: React.ReactNode
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        "pb-2 px-1 whitespace-nowrap transition-colors",
+        active ? "text-emerald-500 border-b-2 border-emerald-500 font-semibold" : "text-gray-400 hover:text-gray-300",
+      )}
+    >
+      {children}
+    </button>
   )
 }
