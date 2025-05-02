@@ -1,17 +1,22 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import Image from "next/image"
 import { motion, AnimatePresence } from "framer-motion"
 import { Volume2, X, ArrowLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { usePoseDetection } from "@/hooks/use-pose-detection"
+import { CameraSwitcher } from "@/components/camera-switcher"
+import { BodyOutline } from "@/components/body-outline"
 
 type CalibrationStatus = "waiting" | "calibrating" | "complete"
 
 export default function ExerciseCameraPage({ params }: { params: { id: string } }) {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const initialCamera = (searchParams.get("camera") as "user" | "environment") || "user"
+
   const exerciseId = params.id
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -20,12 +25,15 @@ export default function ExerciseCameraPage({ params }: { params: { id: string } 
   const [calibrationStatus, setCalibrationStatus] = useState<CalibrationStatus>("waiting")
   const [detectedKeypoints, setDetectedKeypoints] = useState(0)
   const [countdownValue, setCountdownValue] = useState(3)
+  const [showBodyOutline, setShowBodyOutline] = useState(false)
+  const [facingMode, setFacingMode] = useState<"user" | "environment">(initialCamera)
 
   const { isModelLoading, startPoseDetection, stopPoseDetection, detectedPose, exerciseCount, exerciseTime } =
-    usePoseDetection(videoRef, canvasRef, exerciseId)
+    usePoseDetection(videoRef, canvasRef, exerciseId, facingMode)
 
   useEffect(() => {
     if (calibrationStatus === "calibrating") {
+      setShowBodyOutline(true)
       const visibleKeypoints = detectedPose?.keypoints?.filter((kp) => kp.score && kp.score > 0.5).length || 0
       setDetectedKeypoints(visibleKeypoints)
 
@@ -34,6 +42,7 @@ export default function ExerciseCameraPage({ params }: { params: { id: string } 
           setCountdownValue((prev) => {
             if (prev <= 1) {
               setCalibrationStatus("complete")
+              setShowBodyOutline(false)
               return 0
             }
             return prev - 1
@@ -56,6 +65,17 @@ export default function ExerciseCameraPage({ params }: { params: { id: string } 
   const handleExitExercise = () => {
     stopPoseDetection()
     router.push("/dashboard")
+  }
+
+  const handleCameraSwitch = (newFacingMode: "user" | "environment") => {
+    setFacingMode(newFacingMode)
+    // Restart pose detection with new camera
+    if (calibrationStatus !== "waiting") {
+      stopPoseDetection()
+      setTimeout(() => {
+        startPoseDetection(newFacingMode)
+      }, 500)
+    }
   }
 
   // Display the reference image when exercise is active
@@ -162,12 +182,20 @@ export default function ExerciseCameraPage({ params }: { params: { id: string } 
         </button>
       </header>
 
+      {/* Camera Switcher */}
+      {(calibrationStatus === "calibrating" || calibrationStatus === "complete") && (
+        <CameraSwitcher videoRef={videoRef} onCameraSwitch={handleCameraSwitch} />
+      )}
+
       <div className="relative flex-1">
         {/* Camera video feed */}
         <video ref={videoRef} className="absolute inset-0 h-full w-full object-cover" autoPlay playsInline muted />
 
         {/* Canvas for drawing pose skeleton */}
         <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" />
+
+        {/* Body outline reference */}
+        {showBodyOutline && <BodyOutline />}
 
         {/* Loading indicator */}
         {isModelLoading && (
