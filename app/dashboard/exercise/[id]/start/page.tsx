@@ -6,6 +6,8 @@ import Image from "next/image"
 import { motion, AnimatePresence } from "framer-motion"
 import { ArrowLeft, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { DeviceAlignment } from "@/components/device-alignment"
+import { CameraSelector } from "@/components/camera-selector"
 
 const exerciseGifs: Record<string, string> = {
   squats: "/placeholder.svg?height=500&width=300",
@@ -17,6 +19,8 @@ export default function ExerciseStartPage({ params }: { params: { id: string } }
   const router = useRouter()
   const exerciseId = params.id
   const [currentStep, setCurrentStep] = useState(0)
+  const [selectedCamera, setSelectedCamera] = useState<"user" | "environment" | null>(null)
+  const [isDeviceAligned, setIsDeviceAligned] = useState(false)
 
   const steps = [
     {
@@ -36,6 +40,18 @@ export default function ExerciseStartPage({ params }: { params: { id: string } }
         </div>
       ),
       buttonText: "Continue",
+      canProceed: true,
+    },
+    {
+      title: "Select Camera",
+      description: "Choose which camera to use for tracking",
+      content: (
+        <div className="flex flex-col items-center">
+          <CameraSelector onSelect={(camera) => setSelectedCamera(camera)} />
+        </div>
+      ),
+      buttonText: "Continue",
+      canProceed: selectedCamera !== null,
     },
     {
       title: "Setup Your Space",
@@ -60,27 +76,23 @@ export default function ExerciseStartPage({ params }: { params: { id: string } }
         </div>
       ),
       buttonText: "Continue",
+      canProceed: true,
     },
     {
       title: "Adjust Your Device",
       description: "Position your device for optimal tracking",
       content: (
         <div className="flex flex-col items-center">
-          <div className="relative mb-8 mt-4 h-60 w-full rounded-xl bg-gray-800">
-            <div className="absolute left-1/2 top-1/2 h-4 w-40 -translate-x-1/2 -translate-y-1/2 bg-blue-500/50 rounded-lg" />
-            <div className="absolute left-1/2 top-1/2 h-4 w-20 -translate-x-1/2 -translate-y-1/2 bg-orange-500/80 rounded-lg" />
-            <div className="absolute bottom-10 left-0 right-0 flex justify-between px-8">
-              <div className="h-6 w-20 bg-gray-300/20 rounded-sm" />
-              <div className="h-6 w-20 bg-gray-300/20 rounded-sm" />
-            </div>
-            <div className="absolute bottom-20 left-0 right-0 flex justify-center">
-              <p className="text-center text-sm text-gray-400">Align the orange bar with the blue area</p>
-            </div>
-          </div>
-          <p className="text-center text-gray-400">Adjust your device until the level indicator is centered</p>
+          <DeviceAlignment onAligned={() => setIsDeviceAligned(true)} />
+          <p className="text-center text-gray-400">
+            {isDeviceAligned
+              ? "Device aligned correctly! You can proceed."
+              : "Adjust your device until the orange bar is centered in the blue area"}
+          </p>
         </div>
       ),
       buttonText: "Start Camera",
+      canProceed: true, // Allow proceeding even if not aligned for devices without sensors
     },
   ]
 
@@ -90,7 +102,8 @@ export default function ExerciseStartPage({ params }: { params: { id: string } }
     if (currentStep < steps.length - 1) {
       setCurrentStep(currentStep + 1)
     } else {
-      router.push(`/dashboard/exercise/${exerciseId}/camera`)
+      // Pass the selected camera to the camera page
+      router.push(`/dashboard/exercise/${exerciseId}/camera?camera=${selectedCamera || "user"}`)
     }
   }
 
@@ -141,7 +154,11 @@ export default function ExerciseStartPage({ params }: { params: { id: string } }
             ))}
           </div>
 
-          <Button onClick={handleNext} className="w-full bg-emerald-500 py-6 text-lg hover:bg-emerald-600">
+          <Button
+            onClick={handleNext}
+            className="w-full bg-emerald-500 py-6 text-lg hover:bg-emerald-600"
+            disabled={!currentStepContent.canProceed}
+          >
             {currentStepContent.buttonText}
           </Button>
         </div>
