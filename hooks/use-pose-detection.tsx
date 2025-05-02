@@ -21,7 +21,7 @@ type PoseDetectionState = {
   detectedPose: Pose | null
   exerciseCount: number
   exerciseTime: number
-  startPoseDetection: () => Promise<void>
+  startPoseDetection: (facingMode?: "user" | "environment") => Promise<void>
   stopPoseDetection: () => void
 }
 
@@ -50,12 +50,14 @@ export function usePoseDetection(
   videoRef: MutableRefObject<HTMLVideoElement | null>,
   canvasRef: MutableRefObject<HTMLCanvasElement | null>,
   exerciseType: string,
+  initialFacingMode: "user" | "environment" = "user",
 ): PoseDetectionState {
   const [model, setModel] = useState<tf.GraphModel | null>(null)
   const [isModelLoading, setIsModelLoading] = useState(true)
   const [detectedPose, setDetectedPose] = useState<Pose | null>(null)
   const [exerciseCount, setExerciseCount] = useState(0)
   const [exerciseTime, setExerciseTime] = useState(0)
+  const [currentFacingMode, setCurrentFacingMode] = useState<"user" | "environment">(initialFacingMode)
 
   const requestAnimationRef = useRef<number | null>(null)
   const isRunningRef = useRef(false)
@@ -90,16 +92,49 @@ export function usePoseDetection(
   }
 
   // Function to start camera feed
-  async function setupCamera() {
+  async function setupCamera(facingMode: "user" | "environment" = currentFacingMode) {
     if (!videoRef.current) return
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment" },
-        audio: false,
-      })
+      // Try to get the specified camera
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode },
+          audio: false,
+        })
 
-      videoRef.current.srcObject = stream
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream
+          setCurrentFacingMode(facingMode)
+        }
+      } catch (error) {
+        // If specified camera fails, try the other one
+        console.log(`${facingMode} camera not available, trying alternative camera`)
+        const alternateFacingMode = facingMode === "user" ? "environment" : "user"
+
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: alternateFacingMode },
+            audio: false,
+          })
+
+          if (videoRef.current) {
+            videoRef.current.srcObject = stream
+            setCurrentFacingMode(alternateFacingMode)
+          }
+        } catch (fallbackError) {
+          console.error("Both cameras failed:", fallbackError)
+          // Try with no constraints as last resort
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: true,
+            audio: false,
+          })
+
+          if (videoRef.current) {
+            videoRef.current.srcObject = stream
+          }
+        }
+      }
 
       return new Promise<void>((resolve) => {
         if (videoRef.current) {
@@ -377,12 +412,12 @@ export function usePoseDetection(
   }
 
   // Start pose detection process
-  async function startPoseDetection() {
+  async function startPoseDetection(facingMode?: "user" | "environment") {
     if (!model) {
       await loadModel()
     }
 
-    await setupCamera()
+    await setupCamera(facingMode || currentFacingMode)
 
     if (videoRef.current && canvasRef.current) {
       // Set canvas size initially
