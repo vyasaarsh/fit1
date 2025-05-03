@@ -4,13 +4,14 @@ import { useState, useEffect, useRef } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Image from "next/image"
 import { motion, AnimatePresence } from "framer-motion"
-import { Volume2, X, ArrowLeft } from "lucide-react"
+import { Volume2, X, LightbulbIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { usePoseDetection } from "@/hooks/use-pose-detection"
 import { CameraSwitcher } from "@/components/camera-switcher"
 import { BodyOutline } from "@/components/body-outline"
 
 type CalibrationStatus = "waiting" | "calibrating" | "complete"
+type PositioningState = "face-camera" | "move-back" | "move-closer" | "center" | "good"
 
 export default function ExerciseCameraPage({ params }: { params: { id: string } }) {
   const router = useRouter()
@@ -27,6 +28,17 @@ export default function ExerciseCameraPage({ params }: { params: { id: string } 
   const [countdownValue, setCountdownValue] = useState(3)
   const [showBodyOutline, setShowBodyOutline] = useState(false)
   const [facingMode, setFacingMode] = useState<"user" | "environment">(initialCamera)
+  const [positioning, setPositioning] = useState<PositioningState>("face-camera")
+  const [showCountingHelp, setShowCountingHelp] = useState(false)
+
+  // Exercise data
+  const exerciseData = {
+    squats: { name: "Squats", totalReps: 5 },
+    pushups: { name: "Push Ups", totalReps: 5 },
+    planks: { name: "Planks", totalReps: 1 },
+  }
+
+  const currentExercise = exerciseData[exerciseId as keyof typeof exerciseData] || { name: "Exercise", totalReps: 5 }
 
   const { isModelLoading, startPoseDetection, stopPoseDetection, detectedPose, exerciseCount, exerciseTime } =
     usePoseDetection(videoRef, canvasRef, exerciseId, facingMode)
@@ -42,7 +54,6 @@ export default function ExerciseCameraPage({ params }: { params: { id: string } 
           setCountdownValue((prev) => {
             if (prev <= 1) {
               setCalibrationStatus("complete")
-              setShowBodyOutline(false)
               return 0
             }
             return prev - 1
@@ -52,6 +63,33 @@ export default function ExerciseCameraPage({ params }: { params: { id: string } 
         return () => clearTimeout(timer)
       } else {
         setCountdownValue(3)
+      }
+    }
+  }, [calibrationStatus, detectedPose])
+
+  // Update positioning state based on pose detection
+  useEffect(() => {
+    if (calibrationStatus === "complete" && detectedPose) {
+      const keypoints = detectedPose.keypoints
+      const visibleKeypoints = keypoints.filter((kp) => kp.score && kp.score > 0.5).length
+
+      if (visibleKeypoints < 10) {
+        setPositioning("face-camera")
+      } else {
+        // Check if person is centered
+        const nose = keypoints.find((kp) => kp.name === "nose")
+        if (nose && videoRef.current) {
+          const centerX = videoRef.current.videoWidth / 2
+          const distanceFromCenter = Math.abs(nose.x - centerX)
+
+          if (distanceFromCenter > videoRef.current.videoWidth * 0.3) {
+            setPositioning("center")
+          } else {
+            setPositioning("good")
+          }
+        } else {
+          setPositioning("face-camera")
+        }
       }
     }
   }, [calibrationStatus, detectedPose])
@@ -78,12 +116,19 @@ export default function ExerciseCameraPage({ params }: { params: { id: string } 
     }
   }
 
-  // Display the reference image when exercise is active
+  // Format time as MM:SS
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60)
+    const secs = seconds % 60
+    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`
+  }
+
+  // Reference image for the exercise
   const referenceImage = (
-    <div className="absolute bottom-5 right-5 h-32 w-24 overflow-hidden rounded-lg bg-white">
+    <div className="absolute bottom-32 left-5 h-32 w-24 overflow-hidden rounded-lg bg-white">
       <Image
-        src="/placeholder.svg?height=200&width=120"
-        alt="Reference pose"
+        src={`/assets/${exerciseId}-demo.gif`}
+        alt={`${exerciseId} reference`}
         width={120}
         height={200}
         className="h-full w-full object-cover"
@@ -165,22 +210,61 @@ export default function ExerciseCameraPage({ params }: { params: { id: string } 
     </AnimatePresence>
   )
 
+  // Counting help modal
+  const countingHelpModal = (
+    <AnimatePresence>
+      {showCountingHelp && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: 20 }}
+          className="absolute inset-x-4 top-20 z-20 rounded-xl bg-white p-4 text-black shadow-lg"
+        >
+          <h3 className="mb-2 text-lg font-bold">Counting Tips</h3>
+          <p className="mb-3 text-sm">
+            Make sure your entire body is visible and you're performing the full range of motion for each rep.
+          </p>
+          <ul className="mb-3 list-inside list-disc text-sm">
+            <li>Stand with feet shoulder-width apart</li>
+            <li>Keep your back straight</li>
+            <li>Lower until thighs are parallel to ground</li>
+            <li>Push through heels to return up</li>
+          </ul>
+          <Button
+            onClick={() => setShowCountingHelp(false)}
+            className="w-full bg-emerald-500 text-white hover:bg-emerald-600"
+          >
+            Got it
+          </Button>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  )
+
   return (
     <div className="relative flex h-screen flex-col bg-black">
-      <header className="absolute left-0 right-0 top-0 z-20 flex items-center justify-between p-4">
-        <button
-          onClick={() => router.back()}
-          className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-800/80"
-        >
-          <ArrowLeft className="h-5 w-5" />
-        </button>
-        <button
-          onClick={handleExitExercise}
-          className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-800/80"
-        >
-          <X className="h-5 w-5" />
-        </button>
-      </header>
+      {/* Status bar */}
+      <div className="h-10 w-full bg-black flex items-center justify-center">
+        <div className="w-64 h-4 rounded-full bg-black border border-gray-800">
+          <div className="h-2 w-2 rounded-full bg-green-500 mx-auto my-1" />
+        </div>
+      </div>
+
+      {/* Exercise name header */}
+      <div className="w-full bg-black/50 backdrop-blur-sm p-4 border-b border-gray-800">
+        <h1 className="text-4xl font-bold text-white">{currentExercise.name}</h1>
+      </div>
+
+      {/* Counting issues help button */}
+      <button
+        onClick={() => setShowCountingHelp(true)}
+        className="absolute top-20 left-0 right-0 z-10 flex items-center justify-start gap-2 bg-blue-100/80 py-3 px-4 text-blue-900"
+      >
+        <div className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-blue-900">
+          <LightbulbIcon className="h-3 w-3" />
+        </div>
+        <span className="text-sm font-medium">Counting issues? Press here!</span>
+      </button>
 
       {/* Camera Switcher */}
       {(calibrationStatus === "calibrating" || calibrationStatus === "complete") && (
@@ -195,7 +279,7 @@ export default function ExerciseCameraPage({ params }: { params: { id: string } 
         <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" />
 
         {/* Body outline reference */}
-        {showBodyOutline && <BodyOutline />}
+        {(showBodyOutline || calibrationStatus === "complete") && <BodyOutline />}
 
         {/* Loading indicator */}
         {isModelLoading && (
@@ -210,22 +294,77 @@ export default function ExerciseCameraPage({ params }: { params: { id: string } 
         {/* Calibration overlay */}
         {calibrationOverlay}
 
+        {/* Counting help modal */}
+        {countingHelpModal}
+
         {/* Reference image when exercise is active */}
         {calibrationStatus === "complete" && referenceImage}
       </div>
 
       {/* Exercise info bar */}
       {calibrationStatus === "complete" && (
-        <div className="absolute bottom-0 left-0 right-0 bg-black/80 p-4">
-          <div className="text-center">
-            <div className="text-7xl font-bold">{exerciseCount}</div>
-            <div className="text-xl">{exerciseId.charAt(0).toUpperCase() + exerciseId.slice(1)}</div>
-            <div className="mt-2 text-4xl font-medium">
-              {String(Math.floor(exerciseTime / 60)).padStart(2, "0")}:{String(exerciseTime % 60).padStart(2, "0")}
+        <>
+          {/* Counter and timer */}
+          <div className="absolute bottom-20 left-0 right-0 bg-gray-300/80 p-4 flex justify-between items-center">
+            <div className="text-left">
+              <div className="text-5xl font-bold text-navy-900">
+                <span className="text-3xl">x</span>
+                {exerciseCount}
+                <span className="text-gray-600">/{currentExercise.totalReps}</span>
+              </div>
+              <div className="text-xl font-mono text-gray-600">0000</div>
+            </div>
+            <div className="text-right">
+              <div className="text-5xl font-bold text-navy-900">{formatTime(exerciseTime)}</div>
             </div>
           </div>
-        </div>
+
+          {/* Progress bar */}
+          <div className="absolute bottom-16 left-4 right-4">
+            <div className="h-2 bg-gray-200 rounded-full">
+              <div
+                className="h-full bg-emerald-500 rounded-full"
+                style={{ width: `${(exerciseCount / currentExercise.totalReps) * 100}%` }}
+              />
+            </div>
+          </div>
+
+          {/* Positioning instructions */}
+          <div className="absolute bottom-0 left-0 right-0 bg-blue-500 p-4 flex items-center">
+            <div className="h-12 w-12 bg-white rounded-full flex items-center justify-center mr-4">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path
+                  d="M12 12C14.2091 12 16 10.2091 16 8C16 5.79086 14.2091 4 12 4C9.79086 4 8 5.79086 8 8C8 10.2091 9.79086 12 12 12Z"
+                  stroke="#1E40AF"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+                <path d="M12 12V21" stroke="#1E40AF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                <path d="M8 16H16" stroke="#1E40AF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </div>
+            <div>
+              <div className="text-xl font-bold text-white uppercase">Positioning:</div>
+              <div className="text-4xl font-bold text-white uppercase">
+                {positioning === "face-camera" && "FACE THE CAMERA"}
+                {positioning === "move-back" && "MOVE BACK"}
+                {positioning === "move-closer" && "MOVE CLOSER"}
+                {positioning === "center" && "CENTER YOURSELF"}
+                {positioning === "good" && "GOOD POSITION"}
+              </div>
+            </div>
+          </div>
+        </>
       )}
+
+      {/* Exit button */}
+      <button
+        onClick={handleExitExercise}
+        className="absolute right-4 top-4 z-30 flex h-10 w-10 items-center justify-center rounded-full bg-gray-800/80"
+      >
+        <X className="h-5 w-5" />
+      </button>
     </div>
   )
 }
