@@ -6,9 +6,9 @@ import Image from "next/image"
 import { motion, AnimatePresence } from "framer-motion"
 import { Volume2, X, ArrowLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { usePoseDetection } from "@/hooks/use-pose-detection"
-import { CameraSwitcher } from "@/components/camera-switcher"
-import { BodyOutline } from "@/components/body-outline"
+import { usePoseDetection } from "../../../../hooks/use-pose-detection"
+import { CameraSwitcher } from "../../../../components/camera-switcher"
+import { BodyOutline } from "../../../../components/body-outline"
 
 type CalibrationStatus = "waiting" | "calibrating" | "complete"
 
