@@ -236,22 +236,65 @@ export function usePoseDetection(
     const leftHip = keypoints.find((kp) => kp.name === "left_hip")
     const leftKnee = keypoints.find((kp) => kp.name === "left_knee")
     const leftAnkle = keypoints.find((kp) => kp.name === "left_ankle")
+    const rightHip = keypoints.find((kp) => kp.name === "right_hip")
+    const rightKnee = keypoints.find((kp) => kp.name === "right_knee")
+    const rightAnkle = keypoints.find((kp) => kp.name === "right_ankle")
 
-    if (leftHip && leftKnee && leftAnkle && leftHip.score && leftKnee.score && leftAnkle.score > 0.5) {
-      // Calculate knee angle
-      const angle = calculateAngle([leftHip.x, leftHip.y], [leftKnee.x, leftKnee.y], [leftAnkle.x, leftAnkle.y])
+    // Check if we have enough keypoints with good confidence
+    if (
+      leftHip &&
+      leftKnee &&
+      leftAnkle &&
+      rightHip &&
+      rightKnee &&
+      rightAnkle &&
+      leftHip.score &&
+      leftKnee.score &&
+      leftAnkle.score &&
+      rightHip.score &&
+      rightKnee.score &&
+      rightAnkle.score &&
+      leftHip.score > 0.5 &&
+      leftKnee.score > 0.5 &&
+      leftAnkle.score > 0.5 &&
+      rightHip.score > 0.5 &&
+      rightKnee.score > 0.5 &&
+      rightAnkle.score > 0.5
+    ) {
+      // Calculate knee angles for both legs
+      const leftAngle = calculateAngle([leftHip.x, leftHip.y], [leftKnee.x, leftKnee.y], [leftAnkle.x, leftAnkle.y])
+
+      const rightAngle = calculateAngle(
+        [rightHip.x, rightHip.y],
+        [rightKnee.x, rightKnee.y],
+        [rightAnkle.x, rightAnkle.y],
+      )
+
+      // Average both angles for better accuracy
+      const avgAngle = (leftAngle + rightAngle) / 2
 
       // Detect squat based on knee angle
-      if (angle < 110 && lastExerciseStateRef.current === "up") {
+      // Lower threshold for "down" position
+      if (avgAngle < 100 && lastExerciseStateRef.current === "up") {
         // User is in squat position
         lastExerciseStateRef.current = "down"
-      } else if (angle > 160 && lastExerciseStateRef.current === "down") {
+        console.log("Squat down detected", avgAngle)
+      }
+      // Higher threshold for "up" position to avoid false positives
+      else if (avgAngle > 150 && lastExerciseStateRef.current === "down") {
         // User has come back up - count the rep
         lastExerciseStateRef.current = "up"
         setExerciseCount((prev) => prev + 1)
-      } else if (lastExerciseStateRef.current === "unknown" && angle > 160) {
-        // Initial state - user is standing
-        lastExerciseStateRef.current = "up"
+        console.log("Squat up detected - counting rep", avgAngle)
+      } else if (lastExerciseStateRef.current === "unknown") {
+        // Initial state - determine if user is standing or squatting
+        if (avgAngle > 150) {
+          lastExerciseStateRef.current = "up"
+          console.log("Initial position: standing", avgAngle)
+        } else if (avgAngle < 100) {
+          lastExerciseStateRef.current = "down"
+          console.log("Initial position: squatting", avgAngle)
+        }
       }
     }
   }
