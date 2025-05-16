@@ -11,7 +11,6 @@ import { CameraSwitcher } from "@/components/camera-switcher"
 import { BodyOutline } from "@/components/body-outline"
 
 type CalibrationStatus = "waiting" | "calibrating" | "complete"
-type PositioningState = "face-camera" | "move-back" | "move-closer" | "center" | "good"
 type AlignmentStatus = "not-aligned" | "aligning" | "aligned"
 
 export default function ExerciseCameraPage({ params }: { params: { id: string } }) {
@@ -30,12 +29,11 @@ export default function ExerciseCameraPage({ params }: { params: { id: string } 
   const [countdownValue, setCountdownValue] = useState(3)
   const [showBodyOutline, setShowBodyOutline] = useState(false)
   const [facingMode, setFacingMode] = useState<"user" | "environment">(initialCamera)
-  const [positioning, setPositioning] = useState<PositioningState>("face-camera")
   const [showCountingHelp, setShowCountingHelp] = useState(false)
   const [showManualStart, setShowManualStart] = useState(false)
-  const [debugInfo, setDebugInfo] = useState<string>("")
   const [bodyAlignmentStatus, setBodyAlignmentStatus] = useState<AlignmentStatus>("not-aligned")
   const [alignmentTimer, setAlignmentTimer] = useState(0)
+  const [showDebug, setShowDebug] = useState(false)
 
   // Exercise data
   const exerciseData = {
@@ -46,8 +44,15 @@ export default function ExerciseCameraPage({ params }: { params: { id: string } 
 
   const currentExercise = exerciseData[exerciseId as keyof typeof exerciseData] || { name: "Exercise", totalReps: 5 }
 
-  const { isModelLoading, startPoseDetection, stopPoseDetection, detectedPose, exerciseCount, exerciseTime } =
-    usePoseDetection(videoRef, canvasRef, exerciseId, facingMode)
+  const {
+    isModelLoading,
+    startPoseDetection,
+    stopPoseDetection,
+    detectedPose,
+    exerciseCount,
+    exerciseTime,
+    debugInfo,
+  } = usePoseDetection(videoRef, canvasRef, exerciseId, facingMode)
 
   // Check if body is aligned with outline
   useEffect(() => {
@@ -91,14 +96,12 @@ export default function ExerciseCameraPage({ params }: { params: { id: string } 
   useEffect(() => {
     if (calibrationStatus === "calibrating") {
       setShowBodyOutline(true)
-      const visibleKeypoints = detectedPose?.keypoints?.filter((kp) => kp.score && kp.score > 0.3).length || 0
+      const visibleKeypoints = detectedPose?.keypoints?.filter((kp) => kp.score && kp.score > 0.2).length || 0
       setDetectedKeypoints(visibleKeypoints)
-      setDebugInfo(`Detected keypoints: ${visibleKeypoints}/17`)
 
       // If we detect at least 5 keypoints, consider the body as "aligning"
       if (visibleKeypoints >= 5 && bodyAlignmentStatus === "not-aligned") {
         setBodyAlignmentStatus("aligning")
-        setDebugInfo(`Body detected! Aligning...`)
       } else if (visibleKeypoints < 5 && bodyAlignmentStatus !== "not-aligned") {
         setBodyAlignmentStatus("not-aligned")
         setAlignmentTimer(0)
@@ -122,34 +125,6 @@ export default function ExerciseCameraPage({ params }: { params: { id: string } 
       }
     }
   }, [calibrationStatus, detectedPose, bodyAlignmentStatus])
-
-  // Update positioning state based on pose detection
-  useEffect(() => {
-    if (calibrationStatus === "complete" && detectedPose) {
-      const keypoints = detectedPose.keypoints
-      const visibleKeypoints = keypoints.filter((kp) => kp.score && kp.score > 0.3).length
-      setDebugInfo(`Visible keypoints: ${visibleKeypoints}/17`)
-
-      if (visibleKeypoints < 5) {
-        setPositioning("face-camera")
-      } else {
-        // Check if person is centered
-        const nose = keypoints.find((kp) => kp.name === "nose")
-        if (nose && videoRef.current) {
-          const centerX = videoRef.current.videoWidth / 2
-          const distanceFromCenter = Math.abs(nose.x - centerX)
-
-          if (distanceFromCenter > videoRef.current.videoWidth * 0.3) {
-            setPositioning("center")
-          } else {
-            setPositioning("good")
-          }
-        } else {
-          setPositioning("face-camera")
-        }
-      }
-    }
-  }, [calibrationStatus, detectedPose])
 
   const handleStartCalibration = () => {
     setShowInstructions(false)
@@ -187,7 +162,7 @@ export default function ExerciseCameraPage({ params }: { params: { id: string } 
 
   // Reference image for the exercise
   const referenceImage = (
-    <div className="absolute bottom-32 left-5 h-32 w-24 overflow-hidden rounded-lg bg-white">
+    <div className="absolute bottom-32 right-5 h-32 w-24 overflow-hidden rounded-lg bg-white">
       <Image
         src={`/assets/${exerciseId}-demo.gif`}
         alt={`${exerciseId} reference`}
@@ -293,7 +268,6 @@ export default function ExerciseCameraPage({ params }: { params: { id: string } 
             <p className="mt-2 text-gray-400">
               {detectedKeypoints >= 10 ? "Calibrating your pose" : "Make sure your entire body is visible"}
             </p>
-            <p className="mt-1 text-xs text-gray-500">{debugInfo}</p>
           </div>
 
           {showManualStart && (
@@ -348,6 +322,16 @@ export default function ExerciseCameraPage({ params }: { params: { id: string } 
     </div>
   )
 
+  // Debug overlay
+  const debugOverlay = (
+    <div className="absolute top-20 left-4 right-4 bg-black/70 p-2 rounded text-xs text-white z-20">
+      <p>{debugInfo}</p>
+      <p>Detected keypoints: {detectedKeypoints}/17</p>
+      <p>Exercise count: {exerciseCount}</p>
+      <p>Exercise time: {formatTime(exerciseTime)}</p>
+    </div>
+  )
+
   return (
     <div className="relative flex h-screen flex-col bg-black">
       {/* Status bar */}
@@ -361,6 +345,17 @@ export default function ExerciseCameraPage({ params }: { params: { id: string } 
       <div className="w-full bg-black/50 backdrop-blur-sm p-4 border-b border-gray-800">
         <h1 className="text-4xl font-bold text-white">{currentExercise.name}</h1>
       </div>
+
+      {/* Debug toggle */}
+      <button
+        onClick={() => setShowDebug(!showDebug)}
+        className="absolute top-4 left-4 z-30 bg-gray-800/80 rounded-full p-2"
+      >
+        <span className="text-xs">DEBUG</span>
+      </button>
+
+      {/* Show debug info if enabled */}
+      {showDebug && debugOverlay}
 
       {/* Counting issues help button */}
       <button
@@ -436,33 +431,6 @@ export default function ExerciseCameraPage({ params }: { params: { id: string } 
                 className="h-full bg-emerald-500 rounded-full"
                 style={{ width: `${(exerciseCount / currentExercise.totalReps) * 100}%` }}
               />
-            </div>
-          </div>
-
-          {/* Positioning instructions */}
-          <div className="absolute bottom-0 left-0 right-0 bg-blue-500 p-4 flex items-center">
-            <div className="h-12 w-12 bg-white rounded-full flex items-center justify-center mr-4">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path
-                  d="M12 12C14.2091 12 16 10.2091 16 8C16 5.79086 14.2091 4 12 4C9.79086 4 8 5.79086 8 8C8 10.2091 9.79086 12 12 12Z"
-                  stroke="#1E40AF"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-                <path d="M12 12V21" stroke="#1E40AF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                <path d="M8 16H16" stroke="#1E40AF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </div>
-            <div>
-              <div className="text-xl font-bold text-white uppercase">Positioning:</div>
-              <div className="text-4xl font-bold text-white uppercase">
-                {positioning === "face-camera" && "FACE THE CAMERA"}
-                {positioning === "move-back" && "MOVE BACK"}
-                {positioning === "move-closer" && "MOVE CLOSER"}
-                {positioning === "center" && "CENTER YOURSELF"}
-                {positioning === "good" && "GOOD POSITION"}
-              </div>
             </div>
           </div>
         </>
