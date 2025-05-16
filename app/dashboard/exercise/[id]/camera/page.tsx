@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Image from "next/image"
 import { motion, AnimatePresence } from "framer-motion"
-import { Volume2, X, LightbulbIcon } from "lucide-react"
+import { Volume2, X, LightbulbIcon, CheckCircle, AlertTriangle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { usePoseDetection } from "@/hooks/use-pose-detection"
 import { CameraSwitcher } from "@/components/camera-switcher"
@@ -12,6 +12,7 @@ import { BodyOutline } from "@/components/body-outline"
 
 type CalibrationStatus = "waiting" | "calibrating" | "complete"
 type PositioningState = "face-camera" | "move-back" | "move-closer" | "center" | "good"
+type AlignmentStatus = "not-aligned" | "aligning" | "aligned"
 
 export default function ExerciseCameraPage({ params }: { params: { id: string } }) {
   const router = useRouter()
@@ -21,6 +22,7 @@ export default function ExerciseCameraPage({ params }: { params: { id: string } 
   const exerciseId = params.id
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const outlineRef = useRef<HTMLDivElement>(null)
 
   const [showInstructions, setShowInstructions] = useState(true)
   const [calibrationStatus, setCalibrationStatus] = useState<CalibrationStatus>("waiting")
@@ -30,6 +32,10 @@ export default function ExerciseCameraPage({ params }: { params: { id: string } 
   const [facingMode, setFacingMode] = useState<"user" | "environment">(initialCamera)
   const [positioning, setPositioning] = useState<PositioningState>("face-camera")
   const [showCountingHelp, setShowCountingHelp] = useState(false)
+  const [showManualStart, setShowManualStart] = useState(false)
+  const [debugInfo, setDebugInfo] = useState<string>("")
+  const [bodyAlignmentStatus, setBodyAlignmentStatus] = useState<AlignmentStatus>("not-aligned")
+  const [alignmentTimer, setAlignmentTimer] = useState(0)
 
   // Exercise data
   const exerciseData = {
@@ -43,13 +49,63 @@ export default function ExerciseCameraPage({ params }: { params: { id: string } 
   const { isModelLoading, startPoseDetection, stopPoseDetection, detectedPose, exerciseCount, exerciseTime } =
     usePoseDetection(videoRef, canvasRef, exerciseId, facingMode)
 
+  // Check if body is aligned with outline
+  useEffect(() => {
+    if (calibrationStatus === "calibrating" && videoRef.current && outlineRef.current) {
+      // Show manual start button after 3 seconds (reduced from 5)
+      const timer = setTimeout(() => {
+        setShowManualStart(true)
+      }, 3000)
+
+      return () => clearTimeout(timer)
+    }
+  }, [calibrationStatus])
+
+  // Handle body alignment detection
+  useEffect(() => {
+    if (calibrationStatus === "calibrating" && bodyAlignmentStatus === "aligning") {
+      const timer = setTimeout(() => {
+        setAlignmentTimer((prev) => {
+          const newValue = prev + 1
+          if (newValue >= 2) {
+            // 2 seconds of alignment
+            setBodyAlignmentStatus("aligned")
+            return 0
+          }
+          return newValue
+        })
+      }, 1000)
+
+      return () => clearTimeout(timer)
+    }
+  }, [calibrationStatus, bodyAlignmentStatus, alignmentTimer])
+
+  // Auto-proceed when body is aligned
+  useEffect(() => {
+    if (bodyAlignmentStatus === "aligned" && calibrationStatus === "calibrating") {
+      // Auto-proceed to exercise
+      setCalibrationStatus("complete")
+    }
+  }, [bodyAlignmentStatus, calibrationStatus])
+
   useEffect(() => {
     if (calibrationStatus === "calibrating") {
       setShowBodyOutline(true)
-      const visibleKeypoints = detectedPose?.keypoints?.filter((kp) => kp.score && kp.score > 0.5).length || 0
+      const visibleKeypoints = detectedPose?.keypoints?.filter((kp) => kp.score && kp.score > 0.3).length || 0
       setDetectedKeypoints(visibleKeypoints)
+      setDebugInfo(`Detected keypoints: ${visibleKeypoints}/17`)
 
-      if (visibleKeypoints >= 12) {
+      // If we detect at least 5 keypoints, consider the body as "aligning"
+      if (visibleKeypoints >= 5 && bodyAlignmentStatus === "not-aligned") {
+        setBodyAlignmentStatus("aligning")
+        setDebugInfo(`Body detected! Aligning...`)
+      } else if (visibleKeypoints < 5 && bodyAlignmentStatus !== "not-aligned") {
+        setBodyAlignmentStatus("not-aligned")
+        setAlignmentTimer(0)
+      }
+
+      // Traditional keypoint-based progression (as backup)
+      if (visibleKeypoints >= 10) {
         const timer = setTimeout(() => {
           setCountdownValue((prev) => {
             if (prev <= 1) {
@@ -65,15 +121,16 @@ export default function ExerciseCameraPage({ params }: { params: { id: string } 
         setCountdownValue(3)
       }
     }
-  }, [calibrationStatus, detectedPose])
+  }, [calibrationStatus, detectedPose, bodyAlignmentStatus])
 
   // Update positioning state based on pose detection
   useEffect(() => {
     if (calibrationStatus === "complete" && detectedPose) {
       const keypoints = detectedPose.keypoints
-      const visibleKeypoints = keypoints.filter((kp) => kp.score && kp.score > 0.5).length
+      const visibleKeypoints = keypoints.filter((kp) => kp.score && kp.score > 0.3).length
+      setDebugInfo(`Visible keypoints: ${visibleKeypoints}/17`)
 
-      if (visibleKeypoints < 10) {
+      if (visibleKeypoints < 5) {
         setPositioning("face-camera")
       } else {
         // Check if person is centered
@@ -98,6 +155,11 @@ export default function ExerciseCameraPage({ params }: { params: { id: string } 
     setShowInstructions(false)
     startPoseDetection()
     setCalibrationStatus("calibrating")
+  }
+
+  const handleManualStart = () => {
+    setCalibrationStatus("complete")
+    setShowManualStart(false)
   }
 
   const handleExitExercise = () => {
@@ -184,7 +246,34 @@ export default function ExerciseCameraPage({ params }: { params: { id: string } 
           className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-black/60 p-6"
         >
           <div className="mb-4 text-center">
-            <div className="mb-2 text-sm text-gray-400">Detecting keypoints</div>
+            <div className="mb-2 text-sm text-gray-400">
+              {bodyAlignmentStatus === "not-aligned" && "Stand in the red outline"}
+              {bodyAlignmentStatus === "aligning" && "Hold position..."}
+              {bodyAlignmentStatus === "aligned" && "Perfect! Starting exercise..."}
+            </div>
+
+            {/* Body alignment indicator */}
+            <div className="flex justify-center items-center mb-4">
+              {bodyAlignmentStatus === "not-aligned" && (
+                <div className="flex items-center">
+                  <AlertTriangle className="h-6 w-6 text-yellow-500 mr-2" />
+                  <span className="text-yellow-500 font-medium">Position your body in the outline</span>
+                </div>
+              )}
+              {bodyAlignmentStatus === "aligning" && (
+                <div className="flex items-center">
+                  <div className="h-6 w-6 rounded-full border-2 border-blue-500 border-t-transparent animate-spin mr-2"></div>
+                  <span className="text-blue-500 font-medium">Hold still for {2 - alignmentTimer} more seconds</span>
+                </div>
+              )}
+              {bodyAlignmentStatus === "aligned" && (
+                <div className="flex items-center">
+                  <CheckCircle className="h-6 w-6 text-emerald-500 mr-2" />
+                  <span className="text-emerald-500 font-medium">Body aligned! Starting exercise...</span>
+                </div>
+              )}
+            </div>
+
             <div className="flex justify-center space-x-1">
               {Array.from({ length: 12 }).map((_, i) => (
                 <div
@@ -195,16 +284,27 @@ export default function ExerciseCameraPage({ params }: { params: { id: string } 
             </div>
           </div>
 
-          {detectedKeypoints >= 12 && <div className="text-6xl font-bold text-white">{countdownValue}</div>}
+          {detectedKeypoints >= 10 && <div className="text-6xl font-bold text-white">{countdownValue}</div>}
 
           <div className="mt-4 text-center">
             <h3 className="text-2xl font-bold">
-              {detectedKeypoints >= 12 ? "Hold still" : "Move back until your body fits the outline"}
+              {detectedKeypoints >= 10 ? "Hold still" : "Move back until your body fits the outline"}
             </h3>
             <p className="mt-2 text-gray-400">
-              {detectedKeypoints >= 12 ? "Calibrating your pose" : "Make sure your entire body is visible"}
+              {detectedKeypoints >= 10 ? "Calibrating your pose" : "Make sure your entire body is visible"}
             </p>
+            <p className="mt-1 text-xs text-gray-500">{debugInfo}</p>
           </div>
+
+          {showManualStart && (
+            <Button
+              onClick={handleManualStart}
+              className="mt-6 bg-emerald-500 hover:bg-emerald-600 animate-pulse"
+              size="lg"
+            >
+              Start Exercise Manually
+            </Button>
+          )}
         </motion.div>
       )}
     </AnimatePresence>
@@ -239,6 +339,13 @@ export default function ExerciseCameraPage({ params }: { params: { id: string } 
         </motion.div>
       )}
     </AnimatePresence>
+  )
+
+  // Positioning guide
+  const positioningGuide = (
+    <div className="absolute inset-0 z-5 pointer-events-none">
+      <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 border-2 border-dashed border-red-500/50 w-[60%] h-[80%] rounded-lg"></div>
+    </div>
   )
 
   return (
@@ -278,8 +385,11 @@ export default function ExerciseCameraPage({ params }: { params: { id: string } 
         {/* Canvas for drawing pose skeleton */}
         <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" />
 
+        {/* Positioning guide */}
+        {calibrationStatus === "calibrating" && positioningGuide}
+
         {/* Body outline reference */}
-        {(showBodyOutline || calibrationStatus === "complete") && <BodyOutline />}
+        <div ref={outlineRef}>{(showBodyOutline || calibrationStatus === "complete") && <BodyOutline />}</div>
 
         {/* Loading indicator */}
         {isModelLoading && (
