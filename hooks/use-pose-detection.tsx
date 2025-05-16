@@ -23,6 +23,7 @@ type PoseDetectionState = {
   exerciseTime: number
   startPoseDetection: (facingMode?: "user" | "environment") => Promise<void>
   stopPoseDetection: () => void
+  debugInfo: string
 }
 
 // Keypoint names in the order they appear in MoveNet output
@@ -58,15 +59,21 @@ export function usePoseDetection(
   const [exerciseCount, setExerciseCount] = useState(0)
   const [exerciseTime, setExerciseTime] = useState(0)
   const [currentFacingMode, setCurrentFacingMode] = useState<"user" | "environment">(initialFacingMode)
+  const [debugInfo, setDebugInfo] = useState("")
 
   const requestAnimationRef = useRef<number | null>(null)
   const isRunningRef = useRef(false)
   const lastExerciseStateRef = useRef<string>("unknown") // For tracking exercise state (up/down)
   const timerRef = useRef<NodeJS.Timeout | null>(null)
+  const confidenceThreshold = 0.2 // Even lower threshold for keypoint detection (was 0.3)
+  const lastAngleRef = useRef<number>(0)
+  const angleHistoryRef = useRef<number[]>([])
+  const repInProgressRef = useRef(false)
 
   // Initialize TensorFlow and load MoveNet model
   async function loadModel() {
     setIsModelLoading(true)
+    setDebugInfo("Loading TensorFlow.js and MoveNet model...")
 
     try {
       // Make sure TensorFlow.js is properly initialized
@@ -74,6 +81,9 @@ export function usePoseDetection(
 
       // Set the backend to WebGL for better performance
       await tf.setBackend("webgl")
+
+      console.log("TensorFlow.js initialized with backend:", tf.getBackend())
+      setDebugInfo(`TensorFlow.js initialized with backend: ${tf.getBackend()}`)
 
       // Load MoveNet model directly
       const movenetModel = await tf.loadGraphModel(
@@ -83,11 +93,13 @@ export function usePoseDetection(
 
       setModel(movenetModel)
       setIsModelLoading(false)
+      setDebugInfo("MoveNet model loaded successfully")
 
       console.log("MoveNet model loaded successfully")
     } catch (error) {
       console.error("Error loading MoveNet model:", error)
       setIsModelLoading(false)
+      setDebugInfo(`Error loading model: ${error}`)
     }
   }
 
@@ -98,6 +110,9 @@ export function usePoseDetection(
     try {
       // Try to get the specified camera
       try {
+        console.log("Attempting to access camera with facing mode:", facingMode)
+        setDebugInfo(`Accessing camera (${facingMode})...`)
+
         const stream = await navigator.mediaDevices.getUserMedia({
           video: { facingMode },
           audio: false,
@@ -106,10 +121,14 @@ export function usePoseDetection(
         if (videoRef.current) {
           videoRef.current.srcObject = stream
           setCurrentFacingMode(facingMode)
+          console.log("Camera accessed successfully with facing mode:", facingMode)
+          setDebugInfo(`Camera accessed (${facingMode})`)
         }
       } catch (error) {
         // If specified camera fails, try the other one
         console.log(`${facingMode} camera not available, trying alternative camera`)
+        setDebugInfo(`${facingMode} camera failed, trying alternative...`)
+
         const alternateFacingMode = facingMode === "user" ? "environment" : "user"
 
         try {
@@ -121,9 +140,13 @@ export function usePoseDetection(
           if (videoRef.current) {
             videoRef.current.srcObject = stream
             setCurrentFacingMode(alternateFacingMode)
+            console.log("Camera accessed with alternate facing mode:", alternateFacingMode)
+            setDebugInfo(`Camera accessed with alternate mode (${alternateFacingMode})`)
           }
         } catch (fallbackError) {
           console.error("Both cameras failed:", fallbackError)
+          setDebugInfo("Both cameras failed, trying without constraints...")
+
           // Try with no constraints as last resort
           const stream = await navigator.mediaDevices.getUserMedia({
             video: true,
@@ -132,6 +155,8 @@ export function usePoseDetection(
 
           if (videoRef.current) {
             videoRef.current.srcObject = stream
+            console.log("Camera accessed with no facing mode constraints")
+            setDebugInfo("Camera accessed with no facing mode constraints")
           }
         }
       }
@@ -142,9 +167,14 @@ export function usePoseDetection(
             if (videoRef.current) {
               videoRef.current
                 .play()
-                .then(() => resolve())
+                .then(() => {
+                  console.log("Video playback started")
+                  setDebugInfo("Video playback started")
+                  resolve()
+                })
                 .catch((e) => {
                   console.error("Error playing video:", e)
+                  setDebugInfo(`Error playing video: ${e}`)
                   resolve()
                 })
             } else {
@@ -157,6 +187,7 @@ export function usePoseDetection(
       })
     } catch (error) {
       console.error("Error setting up camera:", error)
+      setDebugInfo(`Error setting up camera: ${error}`)
     }
   }
 
@@ -204,6 +235,7 @@ export function usePoseDetection(
       output.dispose()
     } catch (error) {
       console.error("Error during pose detection:", error)
+      setDebugInfo(`Error during pose detection: ${error}`)
     }
 
     // Continue detection loop
@@ -241,61 +273,60 @@ export function usePoseDetection(
     const rightAnkle = keypoints.find((kp) => kp.name === "right_ankle")
 
     // Check if we have enough keypoints with good confidence
-    if (
-      leftHip &&
-      leftKnee &&
-      leftAnkle &&
-      rightHip &&
-      rightKnee &&
-      rightAnkle &&
-      leftHip.score &&
-      leftKnee.score &&
-      leftAnkle.score &&
-      rightHip.score &&
-      rightKnee.score &&
-      rightAnkle.score &&
-      leftHip.score > 0.5 &&
-      leftKnee.score > 0.5 &&
-      leftAnkle.score > 0.5 &&
-      rightHip.score > 0.5 &&
-      rightKnee.score > 0.5 &&
-      rightAnkle.score > 0.5
-    ) {
-      // Calculate knee angles for both legs
-      const leftAngle = calculateAngle([leftHip.x, leftHip.y], [leftKnee.x, leftKnee.y], [leftAnkle.x, leftAnkle.y])
+    // Use either left or right leg, whichever has better visibility
+    const useLeftLeg =
+      leftHip?.score &&
+      leftKnee?.score &&
+      leftAnkle?.score &&
+      leftHip.score > confidenceThreshold &&
+      leftKnee.score > confidenceThreshold &&
+      leftAnkle.score > confidenceThreshold
 
-      const rightAngle = calculateAngle(
-        [rightHip.x, rightHip.y],
-        [rightKnee.x, rightKnee.y],
-        [rightAnkle.x, rightAnkle.y],
-      )
+    const useRightLeg =
+      rightHip?.score &&
+      rightKnee?.score &&
+      rightAnkle?.score &&
+      rightHip.score > confidenceThreshold &&
+      rightKnee.score > confidenceThreshold &&
+      rightAnkle.score > confidenceThreshold
 
-      // Average both angles for better accuracy
-      const avgAngle = (leftAngle + rightAngle) / 2
+    if (useLeftLeg || useRightLeg) {
+      let angle
 
-      // Detect squat based on knee angle
-      // Lower threshold for "down" position
-      if (avgAngle < 100 && lastExerciseStateRef.current === "up") {
-        // User is in squat position
-        lastExerciseStateRef.current = "down"
-        console.log("Squat down detected", avgAngle)
+      if (useLeftLeg) {
+        angle = calculateAngle([leftHip!.x, leftHip!.y], [leftKnee!.x, leftKnee!.y], [leftAnkle!.x, leftAnkle!.y])
+        setDebugInfo(`Left leg angle: ${angle.toFixed(1)}°, State: ${lastExerciseStateRef.current}`)
+      } else {
+        angle = calculateAngle([rightHip!.x, rightHip!.y], [rightKnee!.x, rightKnee!.y], [rightAnkle!.x, rightAnkle!.y])
+        setDebugInfo(`Right leg angle: ${angle.toFixed(1)}°, State: ${lastExerciseStateRef.current}`)
       }
-      // Higher threshold for "up" position to avoid false positives
-      else if (avgAngle > 150 && lastExerciseStateRef.current === "down") {
-        // User has come back up - count the rep
+
+      // Add angle to history for smoothing
+      angleHistoryRef.current.push(angle)
+      if (angleHistoryRef.current.length > 5) {
+        angleHistoryRef.current.shift()
+      }
+
+      // Calculate smoothed angle
+      const smoothedAngle = angleHistoryRef.current.reduce((sum, val) => sum + val, 0) / angleHistoryRef.current.length
+
+      // Detect squat based on knee angle with more lenient thresholds
+      if (smoothedAngle < 120 && !repInProgressRef.current) {
+        // User is starting a squat
+        repInProgressRef.current = true
+        lastExerciseStateRef.current = "down"
+        setDebugInfo(`Squat started: ${smoothedAngle.toFixed(1)}°`)
+      } else if (smoothedAngle > 150 && repInProgressRef.current) {
+        // User has completed a squat
+        repInProgressRef.current = false
         lastExerciseStateRef.current = "up"
         setExerciseCount((prev) => prev + 1)
-        console.log("Squat up detected - counting rep", avgAngle)
-      } else if (lastExerciseStateRef.current === "unknown") {
-        // Initial state - determine if user is standing or squatting
-        if (avgAngle > 150) {
-          lastExerciseStateRef.current = "up"
-          console.log("Initial position: standing", avgAngle)
-        } else if (avgAngle < 100) {
-          lastExerciseStateRef.current = "down"
-          console.log("Initial position: squatting", avgAngle)
-        }
+        setDebugInfo(`Squat completed! Count: ${exerciseCount + 1}`)
       }
+
+      lastAngleRef.current = angle
+    } else {
+      setDebugInfo("Leg keypoints not visible enough. Try adjusting your position.")
     }
   }
 
@@ -303,31 +334,77 @@ export function usePoseDetection(
   function detectPushups(pose: Pose) {
     const keypoints = pose.keypoints
 
-    // Get relevant keypoints
+    // Get relevant keypoints for both arms
     const leftShoulder = keypoints.find((kp) => kp.name === "left_shoulder")
     const leftElbow = keypoints.find((kp) => kp.name === "left_elbow")
     const leftWrist = keypoints.find((kp) => kp.name === "left_wrist")
 
-    if (leftShoulder && leftElbow && leftWrist && leftShoulder.score && leftElbow.score && leftWrist.score > 0.5) {
-      // Calculate elbow angle
-      const angle = calculateAngle(
-        [leftShoulder.x, leftShoulder.y],
-        [leftElbow.x, leftElbow.y],
-        [leftWrist.x, leftWrist.y],
-      )
+    const rightShoulder = keypoints.find((kp) => kp.name === "right_shoulder")
+    const rightElbow = keypoints.find((kp) => kp.name === "right_elbow")
+    const rightWrist = keypoints.find((kp) => kp.name === "right_wrist")
 
-      // Detect pushup based on elbow angle
-      if (angle < 90 && lastExerciseStateRef.current === "up") {
-        // User is in down position
+    // Use either left or right arm, whichever has better visibility
+    const useLeftArm =
+      leftShoulder?.score &&
+      leftElbow?.score &&
+      leftWrist?.score &&
+      leftShoulder.score > confidenceThreshold &&
+      leftElbow.score > confidenceThreshold &&
+      leftWrist.score > confidenceThreshold
+
+    const useRightArm =
+      rightShoulder?.score &&
+      rightElbow?.score &&
+      rightWrist?.score &&
+      rightShoulder.score > confidenceThreshold &&
+      rightElbow.score > confidenceThreshold &&
+      rightWrist.score > confidenceThreshold
+
+    if (useLeftArm || useRightArm) {
+      let angle
+
+      if (useLeftArm) {
+        angle = calculateAngle(
+          [leftShoulder!.x, leftShoulder!.y],
+          [leftElbow!.x, leftElbow!.y],
+          [leftWrist!.x, leftWrist!.y],
+        )
+        setDebugInfo(`Left arm angle: ${angle.toFixed(1)}°, State: ${lastExerciseStateRef.current}`)
+      } else {
+        angle = calculateAngle(
+          [rightShoulder!.x, rightShoulder!.y],
+          [rightElbow!.x, rightElbow!.y],
+          [rightWrist!.x, rightWrist!.y],
+        )
+        setDebugInfo(`Right arm angle: ${angle.toFixed(1)}°, State: ${lastExerciseStateRef.current}`)
+      }
+
+      // Add angle to history for smoothing
+      angleHistoryRef.current.push(angle)
+      if (angleHistoryRef.current.length > 5) {
+        angleHistoryRef.current.shift()
+      }
+
+      // Calculate smoothed angle
+      const smoothedAngle = angleHistoryRef.current.reduce((sum, val) => sum + val, 0) / angleHistoryRef.current.length
+
+      // Detect pushup with more lenient thresholds
+      if (smoothedAngle < 100 && !repInProgressRef.current) {
+        // User is starting a pushup (down position)
+        repInProgressRef.current = true
         lastExerciseStateRef.current = "down"
-      } else if (angle > 160 && lastExerciseStateRef.current === "down") {
-        // User has pushed back up - count the rep
+        setDebugInfo(`Pushup started: ${smoothedAngle.toFixed(1)}°`)
+      } else if (smoothedAngle > 140 && repInProgressRef.current) {
+        // User has completed a pushup
+        repInProgressRef.current = false
         lastExerciseStateRef.current = "up"
         setExerciseCount((prev) => prev + 1)
-      } else if (lastExerciseStateRef.current === "unknown" && angle > 160) {
-        // Initial state - user is in up position
-        lastExerciseStateRef.current = "up"
+        setDebugInfo(`Pushup completed! Count: ${exerciseCount + 1}`)
       }
+
+      lastAngleRef.current = angle
+    } else {
+      setDebugInfo("Arm keypoints not visible enough. Try adjusting your position.")
     }
   }
 
@@ -342,33 +419,45 @@ export function usePoseDetection(
     const leftKnee = keypoints.find((kp) => kp.name === "left_knee")
     const leftAnkle = keypoints.find((kp) => kp.name === "left_ankle")
 
-    if (
-      nose &&
-      leftShoulder &&
-      leftHip &&
-      leftKnee &&
-      leftAnkle &&
-      nose.score &&
-      leftShoulder.score &&
-      leftHip.score &&
-      leftKnee.score &&
-      leftAnkle.score > 0.5
-    ) {
-      // Check if body is roughly horizontal
-      const hipToShoulderYDiff = Math.abs(leftHip.y - leftShoulder.y)
+    const rightShoulder = keypoints.find((kp) => kp.name === "right_shoulder")
+    const rightHip = keypoints.find((kp) => kp.name === "right_hip")
 
-      if (hipToShoulderYDiff < 30) {
+    // Check if we have enough keypoints
+    const hasEnoughKeypoints =
+      (leftShoulder?.score > confidenceThreshold || rightShoulder?.score > confidenceThreshold) &&
+      (leftHip?.score > confidenceThreshold || rightHip?.score > confidenceThreshold)
+
+    if (hasEnoughKeypoints) {
+      // Use whichever side has better visibility
+      const shoulder = leftShoulder?.score > rightShoulder?.score ? leftShoulder : rightShoulder
+      const hip = leftHip?.score > rightHip?.score ? leftHip : rightHip
+
+      // Check if body is roughly horizontal
+      const hipToShoulderYDiff = Math.abs(hip!.y - shoulder!.y)
+      const isHorizontal = hipToShoulderYDiff < 50
+
+      setDebugInfo(`Plank detection: Y-diff=${hipToShoulderYDiff.toFixed(1)}, Horizontal=${isHorizontal}`)
+
+      if (isHorizontal) {
         // Body is in plank position
         if (lastExerciseStateRef.current !== "plank") {
           lastExerciseStateRef.current = "plank"
-          // Start counting or continue counting
+          setDebugInfo("Plank position detected!")
+        }
+
+        // For planks, we count time instead of reps
+        // The timer is already running, so we just need to update the UI
+        if (exerciseCount === 0) {
+          setExerciseCount(1) // Mark as started
         }
       } else {
         if (lastExerciseStateRef.current === "plank") {
           lastExerciseStateRef.current = "unknown"
-          // User stopped plank - could update UI
+          setDebugInfo("Plank position lost")
         }
       }
+    } else {
+      setDebugInfo("Not enough keypoints visible for plank detection")
     }
   }
 
@@ -401,11 +490,16 @@ export function usePoseDetection(
     // Draw keypoints
     if (pose.keypoints) {
       pose.keypoints.forEach((keypoint) => {
-        if (keypoint.score && keypoint.score > 0.5) {
+        if (keypoint.score && keypoint.score > confidenceThreshold) {
           ctx.beginPath()
           ctx.arc(keypoint.x, keypoint.y, 8, 0, 2 * Math.PI)
           ctx.fillStyle = "#10b981" // Green color
           ctx.fill()
+
+          // Add keypoint name for debugging
+          ctx.fillStyle = "white"
+          ctx.font = "12px Arial"
+          ctx.fillText(keypoint.name || "", keypoint.x + 10, keypoint.y)
         }
       })
 
@@ -443,7 +537,14 @@ export function usePoseDetection(
       const start = keypoints.find((kp) => kp.name === startPoint)
       const end = keypoints.find((kp) => kp.name === endPoint)
 
-      if (start && end && start.score && end.score && start.score > 0.5 && end.score > 0.5) {
+      if (
+        start &&
+        end &&
+        start.score &&
+        end.score &&
+        start.score > confidenceThreshold &&
+        end.score > confidenceThreshold
+      ) {
         ctx.beginPath()
         ctx.moveTo(start.x, start.y)
         ctx.lineTo(end.x, end.y)
@@ -466,6 +567,11 @@ export function usePoseDetection(
       // Set canvas size initially
       canvasRef.current.width = videoRef.current.videoWidth || 640
       canvasRef.current.height = videoRef.current.videoHeight || 480
+
+      // Reset exercise state
+      lastExerciseStateRef.current = "unknown"
+      repInProgressRef.current = false
+      angleHistoryRef.current = []
 
       // Start detection loop
       isRunningRef.current = true
@@ -522,5 +628,6 @@ export function usePoseDetection(
     exerciseTime,
     startPoseDetection,
     stopPoseDetection,
+    debugInfo,
   }
 }
