@@ -31,8 +31,42 @@ export function BodyOutline() {
           C200,300 250,350 270,450 
           C290,550 300,650 300,700"
           stroke="#FF5252"
-          strokeWidth="6"
+          strokeWidth="8"
+          strokeOpacity="0.8"
           fill="none"
+        />
+
+        {/* Add a pulsing effect to make it more noticeable */}
+        <path
+          d="M200,100 
+          C230,100 250,80 250,50 
+          C250,20 230,0 200,0 
+          C170,0 150,20 150,50 
+          C150,80 170,100 200,100 
+          
+          M200,100 
+          L200,300 
+          
+          M200,150 
+          C200,150 150,200 120,250 
+          C90,300 80,350 80,350 
+          
+          M200,150 
+          C200,150 250,200 280,250 
+          C310,300 320,350 320,350 
+          
+          M200,300 
+          C200,300 150,350 130,450 
+          C110,550 100,650 100,700 
+          
+          M200,300 
+          C200,300 250,350 270,450 
+          C290,550 300,650 300,700"
+          stroke="#FF5252"
+          strokeWidth="2"
+          strokeOpacity="0.6"
+          fill="none"
+          className="animate-pulse"
         />
       </svg>
     </div>
