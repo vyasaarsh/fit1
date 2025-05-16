@@ -13,8 +13,8 @@ export function DeviceAlignment({ onAligned }: DeviceAlignmentProps) {
   const [permissionState, setPermissionState] = useState<PermissionState | null>(null);
   const [isOrientationAvailable, setIsOrientationAvailable] = useState(false);
   const [hasRequestedPermission, setHasRequestedPermission] = useState(false);
-  const [alignmentTimer, setAlignmentTimer] = useState<number | null>(null); // Timer for 3-second alignment
-  const [countdown, setCountdown] = useState<number>(3); // Countdown display
+  const [alignmentTimer, setAlignmentTimer] = useState<number | null>(null);
+  const [countdown, setCountdown] = useState<number>(3);
 
   // Check if device orientation is available
   useEffect(() => {
@@ -33,8 +33,9 @@ export function DeviceAlignment({ onAligned }: DeviceAlignmentProps) {
     if (beta !== null && gamma !== null) {
       setOrientation({ beta, gamma });
 
-      // Check alignment: we only care about gamma (left-right tilt) for this design
-      const isNowAligned = Math.abs(gamma) < 5; // Orange line should be within the blue area
+      // Check alignment: we only care about beta (front-to-back tilt) for this design
+      // Beta is typically between -90 and 90 degrees; we consider it aligned when close to 0
+      const isNowAligned = Math.abs(beta) < 5; // Orange line should be within the blue area
       setIsAligned(isNowAligned);
     }
   };
@@ -65,27 +66,25 @@ export function DeviceAlignment({ onAligned }: DeviceAlignmentProps) {
     }
   };
 
-  // Clean up event listener on unmount
+  // Clean up event listener and timer on unmount
   useEffect(() => {
     return () => {
       window.removeEventListener("deviceorientation", handleOrientation, true);
-      if (alignmentTimer) clearTimeout(alignmentTimer); // Clean up timer
+      if (alignmentTimer) clearTimeout(alignmentTimer);
     };
   }, [alignmentTimer]);
 
   // Handle the 3-second alignment timer
   useEffect(() => {
     if (isAligned) {
-      // Start the countdown when aligned
-      setCountdown(3); // Reset countdown to 3 seconds
+      setCountdown(3);
       const timer = setTimeout(() => {
         if (isAligned && onAligned) {
-          onAligned(); // Trigger the next step after 3 seconds
+          onAligned();
         }
       }, 3000);
       setAlignmentTimer(timer);
 
-      // Update countdown every second
       const countdownInterval = setInterval(() => {
         setCountdown((prev) => {
           if (prev <= 1) {
@@ -101,15 +100,14 @@ export function DeviceAlignment({ onAligned }: DeviceAlignmentProps) {
         clearInterval(countdownInterval);
       };
     } else {
-      // Reset timer and countdown if alignment is lost
       if (alignmentTimer) clearTimeout(alignmentTimer);
       setAlignmentTimer(null);
       setCountdown(3);
     }
   }, [isAligned, onAligned]);
 
-  // Calculate the position of the orange line based on gamma (left-right tilt)
-  const lineX = Math.min(Math.max((orientation.gamma || 0) * 3, -150), 150); // Scale gamma for movement
+  // Calculate the position of the orange line based on beta (front-to-back tilt)
+  const lineY = Math.min(Math.max((orientation.beta || 0) * 3, -150), 150); // Scale beta for movement
 
   return (
     <div className="relative h-screen w-full bg-gray-900 flex flex-col items-center justify-center">
@@ -156,17 +154,17 @@ export function DeviceAlignment({ onAligned }: DeviceAlignmentProps) {
                 </p>
               </div>
 
-              {/* Blue target area */}
+              {/* Blue target area (horizontal) */}
               <div className="absolute left-1/2 top-1/2 h-12 w-64 -translate-x-1/2 -translate-y-1/2 bg-blue-500 rounded-lg" />
 
-              {/* Orange line */}
+              {/* Orange line (moves vertically) */}
               <motion.div
-                className="absolute top-1/2 h-1 w-64 -translate-y-1/2 bg-orange-500"
+                className="absolute left-1/2 top-1/2 h-12 w-1 bg-orange-500"
                 style={{
-                  left: "50%",
-                  x: lineX,
+                  top: "50%",
+                  y: lineY,
                 }}
-                animate={{ x: lineX }}
+                animate={{ y: lineY }}
                 transition={{ type: "spring", stiffness: 300, damping: 20 }}
               />
 
