@@ -39,6 +39,9 @@ export default function DashboardLayout({
     },
   ]
 
+  // Check if current page is a camera page
+  const isCameraPage = pathname.includes("/camera")
+
   if (!mounted) return null
 
   return (
@@ -46,34 +49,36 @@ export default function DashboardLayout({
       {/* Main content */}
       <main className="flex-1 pb-16">{children}</main>
 
-      {/* Bottom navigation bar */}
-      <div className="fixed bottom-0 left-0 right-0 border-t border-gray-800 bg-gray-900/80 backdrop-blur-lg">
-        <nav className="flex h-16 items-center justify-around">
-          {navItems.map((item) => {
-            const isActive = pathname === item.path
+      {/* Bottom navigation bar - hidden on camera pages */}
+      {!isCameraPage && (
+        <div className="fixed bottom-0 left-0 right-0 border-t border-gray-800 bg-gray-900/80 backdrop-blur-lg">
+          <nav className="flex h-16 items-center justify-around">
+            {navItems.map((item) => {
+              const isActive = pathname === item.path
 
-            return (
-              <Link
-                key={item.path}
-                href={item.path}
-                className={`relative flex flex-col items-center justify-center px-3 py-2 ${
-                  isActive ? "text-emerald-500" : "text-gray-400"
-                }`}
-              >
-                {isActive && (
-                  <motion.span
-                    layoutId="bubble"
-                    className="absolute -top-1 h-1 w-12 rounded-full bg-emerald-500"
-                    transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
-                  />
-                )}
-                {item.icon}
-                <span className="text-xs">{item.name}</span>
-              </Link>
-            )
-          })}
-        </nav>
-      </div>
+              return (
+                <Link
+                  key={item.path}
+                  href={item.path}
+                  className={`relative flex flex-col items-center justify-center px-3 py-2 ${
+                    isActive ? "text-emerald-500" : "text-gray-400"
+                  }`}
+                >
+                  {isActive && (
+                    <motion.span
+                      layoutId="bubble"
+                      className="absolute -top-1 h-1 w-12 rounded-full bg-emerald-500"
+                      transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                    />
+                  )}
+                  {item.icon}
+                  <span className="text-xs">{item.name}</span>
+                </Link>
+              )
+            })}
+          </nav>
+        </div>
+      )}
     </div>
   )
 }
