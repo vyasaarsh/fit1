@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Image from "next/image"
 import { motion, AnimatePresence } from "framer-motion"
-import { Volume2, X, LightbulbIcon, CheckCircle, AlertTriangle } from "lucide-react"
+import { Volume2, X, LightbulbIcon, CheckCircle, AlertTriangle, ZapIcon, Info } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { usePoseDetection } from "@/hooks/use-pose-detection"
 import { CameraZoomControl } from "@/components/camera-zoom-control"
@@ -36,6 +36,11 @@ export default function ExerciseCameraPage({ params }: { params: { id: string } 
   const [alignmentTimer, setAlignmentTimer] = useState(0)
   const [showDebug, setShowDebug] = useState(false)
   const [zoomLevel, setZoomLevel] = useState(1)
+  const [showTroubleshooting, setShowTroubleshooting] = useState(false)
+  const [calibrationRetries, setCalibrationRetries] = useState(0)
+
+  // For auto-retry
+  const calibrationTimerRef = useRef<NodeJS.Timeout | null>(null)
 
   // Exercise data
   const exerciseData = {
@@ -54,6 +59,8 @@ export default function ExerciseCameraPage({ params }: { params: { id: string } 
     exerciseCount,
     exerciseTime,
     debugInfo,
+    detectionStatus,
+    forceDectection,
   } = usePoseDetection(videoRef, canvasRef, exerciseId, facingMode)
 
   // Handle zoom change
@@ -66,6 +73,40 @@ export default function ExerciseCameraPage({ params }: { params: { id: string } 
       canvasRef.current.style.transformOrigin = "center"
     }
   }
+
+  // Auto-retry if no detection occurs
+  useEffect(() => {
+    if (calibrationStatus === "calibrating" && !isModelLoading) {
+      if (calibrationTimerRef.current) {
+        clearTimeout(calibrationTimerRef.current)
+      }
+
+      calibrationTimerRef.current = setTimeout(() => {
+        if (detectionStatus === "none" && calibrationRetries < 2) {
+          // Try restarting detection
+          stopPoseDetection()
+          setTimeout(() => {
+            startPoseDetection(facingMode)
+            setCalibrationRetries((prev) => prev + 1)
+          }, 500)
+        }
+      }, 10000) // Wait 10 seconds before auto-retry
+
+      return () => {
+        if (calibrationTimerRef.current) {
+          clearTimeout(calibrationTimerRef.current)
+        }
+      }
+    }
+  }, [
+    calibrationStatus,
+    isModelLoading,
+    detectionStatus,
+    calibrationRetries,
+    facingMode,
+    startPoseDetection,
+    stopPoseDetection,
+  ])
 
   // Check if body is aligned with outline
   useEffect(() => {
@@ -98,18 +139,19 @@ export default function ExerciseCameraPage({ params }: { params: { id: string } 
     }
   }, [calibrationStatus, bodyAlignmentStatus, alignmentTimer])
 
-  // Auto-proceed when body is aligned
+  // Auto-proceed when body is aligned or detection is good
   useEffect(() => {
-    if (bodyAlignmentStatus === "aligned" && calibrationStatus === "calibrating") {
+    if ((bodyAlignmentStatus === "aligned" || detectionStatus === "good") && calibrationStatus === "calibrating") {
       // Auto-proceed to exercise
       setCalibrationStatus("complete")
     }
-  }, [bodyAlignmentStatus, calibrationStatus])
+  }, [bodyAlignmentStatus, calibrationStatus, detectionStatus])
 
+  // Update keypoint detection
   useEffect(() => {
     if (calibrationStatus === "calibrating") {
       setShowBodyOutline(true)
-      const visibleKeypoints = detectedPose?.keypoints?.filter((kp) => kp.score && kp.score > 0.2).length || 0
+      const visibleKeypoints = detectedPose?.keypoints?.filter((kp) => kp.score && kp.score > 0.1).length || 0
       setDetectedKeypoints(visibleKeypoints)
 
       // If we detect at least 5 keypoints, consider the body as "aligning"
@@ -121,7 +163,8 @@ export default function ExerciseCameraPage({ params }: { params: { id: string } 
       }
 
       // Traditional keypoint-based progression (as backup)
-      if (visibleKeypoints >= 10) {
+      if (visibleKeypoints >= 8) {
+        // Reduced from 10
         const timer = setTimeout(() => {
           setCountdownValue((prev) => {
             if (prev <= 1) {
@@ -146,6 +189,7 @@ export default function ExerciseCameraPage({ params }: { params: { id: string } 
   }
 
   const handleManualStart = () => {
+    forceDectection()
     setCalibrationStatus("complete")
     setShowManualStart(false)
   }
@@ -261,26 +305,154 @@ export default function ExerciseCameraPage({ params }: { params: { id: string } 
             </div>
           </div>
 
-          {detectedKeypoints >= 10 && <div className="text-6xl font-bold text-white">{countdownValue}</div>}
+          {detectedKeypoints >= 8 && <div className="text-6xl font-bold text-white">{countdownValue}</div>}
 
           <div className="mt-4 text-center">
             <h3 className="text-2xl font-bold">
-              {detectedKeypoints >= 10 ? "Hold still" : "Move back until your body fits the outline"}
+              {detectedKeypoints >= 8 ? "Hold still" : "Move back until your body fits the outline"}
             </h3>
             <p className="mt-2 text-gray-400">
-              {detectedKeypoints >= 10 ? "Calibrating your pose" : "Make sure your entire body is visible"}
+              {detectedKeypoints >= 8 ? "Calibrating your pose" : "Make sure your entire body is visible"}
             </p>
           </div>
 
-          {showManualStart && (
+          {/* Detection status indicator */}
+          <div className="mt-4 flex items-center justify-center gap-2">
+            <div
+              className={`h-3 w-3 rounded-full ${
+                detectionStatus === "none"
+                  ? "bg-red-500"
+                  : detectionStatus === "partial"
+                    ? "bg-yellow-500"
+                    : "bg-green-500"
+              } animate-pulse`}
+            ></div>
+            <span className="text-sm text-gray-300">
+              {detectionStatus === "none"
+                ? "No detection"
+                : detectionStatus === "partial"
+                  ? "Partial detection"
+                  : "Good detection"}
+            </span>
+          </div>
+
+          {/* Help buttons */}
+          <div className="mt-6 flex flex-col gap-4 max-w-md w-full">
+            {showManualStart && (
+              <Button
+                onClick={handleManualStart}
+                className="w-full bg-emerald-500 hover:bg-emerald-600 animate-pulse"
+                size="lg"
+              >
+                <ZapIcon className="mr-2 h-5 w-5" />
+                Start Exercise Without Detection
+              </Button>
+            )}
+
             <Button
-              onClick={handleManualStart}
-              className="mt-6 bg-emerald-500 hover:bg-emerald-600 animate-pulse"
-              size="lg"
+              onClick={() => setShowTroubleshooting(true)}
+              className="bg-gray-700 hover:bg-gray-600"
+              variant="outline"
             >
-              Start Exercise Manually
+              <Info className="mr-2 h-5 w-5" />
+              Troubleshooting Tips
             </Button>
-          )}
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  )
+
+  // Troubleshooting modal
+  const troubleshootingModal = (
+    <AnimatePresence>
+      {showTroubleshooting && (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.9 }}
+          className="absolute inset-0 z-20 flex items-center justify-center bg-black/80 p-6"
+        >
+          <div className="max-w-md rounded-2xl bg-gray-900 p-6">
+            <h2 className="mb-4 text-2xl font-bold text-center">Troubleshooting</h2>
+
+            <div className="space-y-4 mb-6">
+              <div className="bg-gray-800 rounded-lg p-4">
+                <h3 className="font-bold text-emerald-500 flex items-center gap-2">
+                  <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-500">
+                    1
+                  </span>
+                  Lighting
+                </h3>
+                <p className="text-sm text-gray-300 mt-1">
+                  Make sure you're in a well-lit area. Avoid backlighting (don't stand in front of a window).
+                </p>
+              </div>
+
+              <div className="bg-gray-800 rounded-lg p-4">
+                <h3 className="font-bold text-emerald-500 flex items-center gap-2">
+                  <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-500">
+                    2
+                  </span>
+                  Distance
+                </h3>
+                <p className="text-sm text-gray-300 mt-1">
+                  Try the 0.5x zoom option and move 6-8 feet away from the camera so your entire body is visible.
+                </p>
+              </div>
+
+              <div className="bg-gray-800 rounded-lg p-4">
+                <h3 className="font-bold text-emerald-500 flex items-center gap-2">
+                  <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-500">
+                    3
+                  </span>
+                  Clothing
+                </h3>
+                <p className="text-sm text-gray-300 mt-1">
+                  Wear contrasting clothes (different from your background). Avoid loose/baggy clothing.
+                </p>
+              </div>
+
+              <div className="bg-gray-800 rounded-lg p-4">
+                <h3 className="font-bold text-emerald-500 flex items-center gap-2">
+                  <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-500">
+                    4
+                  </span>
+                  Background
+                </h3>
+                <p className="text-sm text-gray-300 mt-1">
+                  Use a clean, uncluttered background. Solid colored walls work best.
+                </p>
+              </div>
+
+              <div className="bg-gray-800 rounded-lg p-4">
+                <h3 className="font-bold text-emerald-500 flex items-center gap-2">
+                  <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-500">
+                    5
+                  </span>
+                  Device Position
+                </h3>
+                <p className="text-sm text-gray-300 mt-1">
+                  Place your device at waist height for best results. Try different angles.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-4">
+              <Button
+                onClick={() => {
+                  setShowTroubleshooting(false)
+                  handleManualStart()
+                }}
+                className="flex-1 bg-emerald-500 hover:bg-emerald-600"
+              >
+                Skip Detection
+              </Button>
+              <Button onClick={() => setShowTroubleshooting(false)} className="flex-1" variant="outline">
+                Try Again
+              </Button>
+            </div>
+          </div>
         </motion.div>
       )}
     </AnimatePresence>
@@ -321,6 +493,23 @@ export default function ExerciseCameraPage({ params }: { params: { id: string } 
   const positioningGuide = (
     <div className="absolute inset-0 z-5 pointer-events-none">
       <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 border-2 border-dashed border-red-500/50 w-[60%] h-[80%] rounded-lg"></div>
+
+      {/* Human silhouette for positioning */}
+      <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 opacity-20">
+        <svg width="200" height="400" viewBox="0 0 200 400" fill="none">
+          <path
+            d="M100,80 C115,80 130,65 130,50 C130,35 115,20 100,20 C85,20 70,35 70,50 C70,65 85,80 100,80 Z"
+            fill="white"
+          />
+          <path
+            d="M100,80 L100,220 M100,120 L70,180 M100,120 L130,180 M100,220 L70,320 M100,220 L130,320"
+            stroke="white"
+            strokeWidth="10"
+            opacity="0.7"
+            strokeLinecap="round"
+          />
+        </svg>
+      </div>
     </div>
   )
 
@@ -332,6 +521,8 @@ export default function ExerciseCameraPage({ params }: { params: { id: string } 
       <p>Exercise count: {exerciseCount}</p>
       <p>Exercise time: {formatTime(exerciseTime)}</p>
       <p>Zoom level: {zoomLevel}x</p>
+      <p>Detection status: {detectionStatus}</p>
+      <p>Calibration retries: {calibrationRetries}</p>
     </div>
   )
 
@@ -361,15 +552,17 @@ export default function ExerciseCameraPage({ params }: { params: { id: string } 
       {showDebug && debugOverlay}
 
       {/* Counting issues help button */}
-      <button
-        onClick={() => setShowCountingHelp(true)}
-        className="absolute top-20 left-0 right-0 z-10 flex items-center justify-start gap-2 bg-blue-100/80 py-3 px-4 text-blue-900"
-      >
-        <div className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-blue-900">
-          <LightbulbIcon className="h-3 w-3" />
-        </div>
-        <span className="text-sm font-medium">Counting issues? Press here!</span>
-      </button>
+      {calibrationStatus === "complete" && (
+        <button
+          onClick={() => setShowCountingHelp(true)}
+          className="absolute top-20 left-0 right-0 z-10 flex items-center justify-start gap-2 bg-blue-100/80 py-3 px-4 text-blue-900"
+        >
+          <div className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-blue-900">
+            <LightbulbIcon className="h-3 w-3" />
+          </div>
+          <span className="text-sm font-medium">Counting issues? Press here!</span>
+        </button>
+      )}
 
       {/* Zoom control */}
       {(calibrationStatus === "calibrating" || calibrationStatus === "complete") && (
@@ -391,8 +584,13 @@ export default function ExerciseCameraPage({ params }: { params: { id: string } 
 
         {/* Loading indicator */}
         {isModelLoading && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/80">
-            <div className="loader"></div>
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80">
+            <div className="loader mb-4"></div>
+            <p className="text-white text-center">
+              Loading pose detection model
+              <br />
+              This may take a few moments...
+            </p>
           </div>
         )}
 
@@ -401,6 +599,9 @@ export default function ExerciseCameraPage({ params }: { params: { id: string } 
 
         {/* Calibration overlay */}
         {calibrationOverlay}
+
+        {/* Troubleshooting modal */}
+        {troubleshootingModal}
 
         {/* Counting help modal */}
         {countingHelpModal}
