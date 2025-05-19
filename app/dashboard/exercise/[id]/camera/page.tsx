@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import { Volume2, X, LightbulbIcon, CheckCircle, AlertTriangle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { usePoseDetection } from "@/hooks/use-pose-detection"
-import { CameraSwitcher } from "@/components/camera-switcher"
+import { CameraZoomControl } from "@/components/camera-zoom-control"
 import { BodyOutline } from "@/components/body-outline"
 
 type CalibrationStatus = "waiting" | "calibrating" | "complete"
@@ -16,7 +16,8 @@ type AlignmentStatus = "not-aligned" | "aligning" | "aligned"
 export default function ExerciseCameraPage({ params }: { params: { id: string } }) {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const initialCamera = (searchParams.get("camera") as "user" | "environment") || "user"
+  // Always use front camera (user)
+  const initialCamera = "user"
 
   const exerciseId = params.id
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -34,6 +35,7 @@ export default function ExerciseCameraPage({ params }: { params: { id: string } 
   const [bodyAlignmentStatus, setBodyAlignmentStatus] = useState<AlignmentStatus>("not-aligned")
   const [alignmentTimer, setAlignmentTimer] = useState(0)
   const [showDebug, setShowDebug] = useState(false)
+  const [zoomLevel, setZoomLevel] = useState(1)
 
   // Exercise data
   const exerciseData = {
@@ -53,6 +55,17 @@ export default function ExerciseCameraPage({ params }: { params: { id: string } 
     exerciseTime,
     debugInfo,
   } = usePoseDetection(videoRef, canvasRef, exerciseId, facingMode)
+
+  // Handle zoom change
+  const handleZoomChange = (newZoom: number) => {
+    setZoomLevel(newZoom)
+
+    // Adjust canvas to match video zoom
+    if (canvasRef.current) {
+      canvasRef.current.style.transform = newZoom === 0.5 ? "scale(0.5)" : "scale(1)"
+      canvasRef.current.style.transformOrigin = "center"
+    }
+  }
 
   // Check if body is aligned with outline
   useEffect(() => {
@@ -140,17 +153,6 @@ export default function ExerciseCameraPage({ params }: { params: { id: string } 
   const handleExitExercise = () => {
     stopPoseDetection()
     router.push("/dashboard")
-  }
-
-  const handleCameraSwitch = (newFacingMode: "user" | "environment") => {
-    setFacingMode(newFacingMode)
-    // Restart pose detection with new camera
-    if (calibrationStatus !== "waiting") {
-      stopPoseDetection()
-      setTimeout(() => {
-        startPoseDetection(newFacingMode)
-      }, 500)
-    }
   }
 
   // Format time as MM:SS
@@ -329,6 +331,7 @@ export default function ExerciseCameraPage({ params }: { params: { id: string } 
       <p>Detected keypoints: {detectedKeypoints}/17</p>
       <p>Exercise count: {exerciseCount}</p>
       <p>Exercise time: {formatTime(exerciseTime)}</p>
+      <p>Zoom level: {zoomLevel}x</p>
     </div>
   )
 
@@ -368,9 +371,9 @@ export default function ExerciseCameraPage({ params }: { params: { id: string } 
         <span className="text-sm font-medium">Counting issues? Press here!</span>
       </button>
 
-      {/* Camera Switcher */}
+      {/* Zoom control */}
       {(calibrationStatus === "calibrating" || calibrationStatus === "complete") && (
-        <CameraSwitcher videoRef={videoRef} onCameraSwitch={handleCameraSwitch} />
+        <CameraZoomControl videoRef={videoRef} onZoomChange={handleZoomChange} />
       )}
 
       <div className="relative flex-1">
