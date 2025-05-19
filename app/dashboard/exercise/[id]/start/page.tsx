@@ -7,7 +7,6 @@ import { motion, AnimatePresence } from "framer-motion"
 import { ArrowLeft, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { DeviceAlignment } from "@/components/device-alignment"
-import { CameraSelector } from "@/components/camera-selector"
 
 const exerciseGifs: Record<string, string> = {
   squats: "/placeholder.svg?height=500&width=300",
@@ -19,9 +18,9 @@ export default function ExerciseStartPage({ params }: { params: { id: string } }
   const router = useRouter()
   const exerciseId = params.id
   const [currentStep, setCurrentStep] = useState(0)
-  const [selectedCamera, setSelectedCamera] = useState<"user" | "environment" | null>(null)
   const [isDeviceAligned, setIsDeviceAligned] = useState(false)
 
+  // Removed camera selection step
   const steps = [
     {
       title: "Exercise Demo",
@@ -41,17 +40,6 @@ export default function ExerciseStartPage({ params }: { params: { id: string } }
       ),
       buttonText: "Continue",
       canProceed: true,
-    },
-    {
-      title: "Select Camera",
-      description: "Choose which camera to use for tracking",
-      content: (
-        <div className="flex flex-col items-center">
-          <CameraSelector onSelect={(camera) => setSelectedCamera(camera)} />
-        </div>
-      ),
-      buttonText: "Continue",
-      canProceed: selectedCamera !== null,
     },
     {
       title: "Setup Your Space",
@@ -83,7 +71,7 @@ export default function ExerciseStartPage({ params }: { params: { id: string } }
       description: "Position your device for optimal tracking",
       content: (
         <div className="flex flex-col items-center">
-          <DeviceAlignment onAligned={() => setIsDeviceAligned(true)} />
+          <DeviceAlignment onAligned={() => setIsDeviceAligned(true)} onSkip={() => setIsDeviceAligned(true)} />
           <p className="text-center text-gray-400">
             {isDeviceAligned
               ? "Device aligned correctly! You can proceed."
@@ -92,7 +80,7 @@ export default function ExerciseStartPage({ params }: { params: { id: string } }
         </div>
       ),
       buttonText: "Start Camera",
-      canProceed: true, // Allow proceeding even if not aligned for devices without sensors
+      canProceed: isDeviceAligned, // Now we can proceed when aligned or skipped
     },
   ]
 
@@ -102,8 +90,8 @@ export default function ExerciseStartPage({ params }: { params: { id: string } }
     if (currentStep < steps.length - 1) {
       setCurrentStep(currentStep + 1)
     } else {
-      // Pass the selected camera to the camera page
-      router.push(`/dashboard/exercise/${exerciseId}/camera?camera=${selectedCamera || "user"}`)
+      // Always use front camera (user)
+      router.push(`/dashboard/exercise/${exerciseId}/camera?camera=user`)
     }
   }
 
