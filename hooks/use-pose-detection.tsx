@@ -24,6 +24,8 @@ type PoseDetectionState = {
   startPoseDetection: (facingMode?: "user" | "environment") => Promise<void>
   stopPoseDetection: () => void
   debugInfo: string
+  detectionStatus: "none" | "partial" | "good"
+  forceDectection: () => void
 }
 
 // Keypoint names in the order they appear in MoveNet output
@@ -60,15 +62,24 @@ export function usePoseDetection(
   const [exerciseTime, setExerciseTime] = useState(0)
   const [currentFacingMode, setCurrentFacingMode] = useState<"user" | "environment">(initialFacingMode)
   const [debugInfo, setDebugInfo] = useState("")
+  const [detectionStatus, setDetectionStatus] = useState<"none" | "partial" | "good">("none")
+  const [attemptCount, setAttemptCount] = useState(0)
 
   const requestAnimationRef = useRef<number | null>(null)
   const isRunningRef = useRef(false)
   const lastExerciseStateRef = useRef<string>("unknown") // For tracking exercise state (up/down)
   const timerRef = useRef<NodeJS.Timeout | null>(null)
-  const confidenceThreshold = 0.2 // Even lower threshold for keypoint detection (was 0.3)
+  const confidenceThreshold = 0.1 // Even lower threshold for keypoint detection (was 0.2)
   const lastAngleRef = useRef<number>(0)
   const angleHistoryRef = useRef<number[]>([])
   const repInProgressRef = useRef(false)
+  const detectionHistoryRef = useRef<number[]>([])
+
+  // Force detection if needed
+  const forceDectection = () => {
+    setDetectionStatus("good")
+    setDebugInfo("Detection forced by user")
+  }
 
   // Initialize TensorFlow and load MoveNet model
   async function loadModel() {
@@ -80,26 +91,46 @@ export function usePoseDetection(
       await tf.ready()
 
       // Set the backend to WebGL for better performance
-      await tf.setBackend("webgl")
+      try {
+        await tf.setBackend("webgl")
+        console.log("Using WebGL backend")
+        setDebugInfo("Using WebGL backend for better performance")
+      } catch (e) {
+        console.log("WebGL backend failed, falling back to CPU", e)
+        await tf.setBackend("cpu")
+        setDebugInfo("Using CPU backend (WebGL not available)")
+      }
 
       console.log("TensorFlow.js initialized with backend:", tf.getBackend())
       setDebugInfo(`TensorFlow.js initialized with backend: ${tf.getBackend()}`)
 
-      // Load MoveNet model directly
-      const movenetModel = await tf.loadGraphModel(
-        "https://tfhub.dev/google/tfjs-model/movenet/singlepose/lightning/4",
-        { fromTFHub: true },
-      )
+      try {
+        // Load MoveNet model (with a timeout)
+        const modelPromise = tf.loadGraphModel("https://tfhub.dev/google/tfjs-model/movenet/singlepose/lightning/4", {
+          fromTFHub: true,
+        })
 
-      setModel(movenetModel)
-      setIsModelLoading(false)
-      setDebugInfo("MoveNet model loaded successfully")
+        // Add a timeout for model loading
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error("Model loading timed out after 20 seconds")), 20000),
+        )
 
-      console.log("MoveNet model loaded successfully")
+        // Race the model loading against the timeout
+        const movenetModel = (await Promise.race([modelPromise, timeoutPromise])) as tf.GraphModel
+
+        setModel(movenetModel)
+        setIsModelLoading(false)
+        setDebugInfo("MoveNet model loaded successfully")
+        console.log("MoveNet model loaded successfully")
+      } catch (error) {
+        console.error("Error loading MoveNet model:", error)
+        setIsModelLoading(false)
+        setDebugInfo(`Error loading model: ${error}. Try reloading the page.`)
+      }
     } catch (error) {
-      console.error("Error loading MoveNet model:", error)
+      console.error("Error initializing TensorFlow:", error)
       setIsModelLoading(false)
-      setDebugInfo(`Error loading model: ${error}`)
+      setDebugInfo(`Error initializing TensorFlow: ${error}`)
     }
   }
 
@@ -113,41 +144,31 @@ export function usePoseDetection(
         console.log("Attempting to access camera with facing mode:", facingMode)
         setDebugInfo(`Accessing camera (${facingMode})...`)
 
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode },
+        const constraints = {
+          video: {
+            facingMode,
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+          },
           audio: false,
-        })
+        }
+
+        const stream = await navigator.mediaDevices.getUserMedia(constraints)
 
         if (videoRef.current) {
           videoRef.current.srcObject = stream
           setCurrentFacingMode(facingMode)
           console.log("Camera accessed successfully with facing mode:", facingMode)
-          setDebugInfo(`Camera accessed (${facingMode})`)
+          setDebugInfo(
+            `Camera accessed (${facingMode}) at resolution: ${videoRef.current.videoWidth}x${videoRef.current.videoHeight}`,
+          )
         }
       } catch (error) {
-        // If specified camera fails, try the other one
-        console.log(`${facingMode} camera not available, trying alternative camera`)
-        setDebugInfo(`${facingMode} camera failed, trying alternative...`)
-
-        const alternateFacingMode = facingMode === "user" ? "environment" : "user"
+        // If specified camera fails, try with no constraints as last resort
+        console.log("Camera access failed, trying with basic constraints", error)
+        setDebugInfo(`Camera access failed: ${error}. Trying with basic constraints...`)
 
         try {
-          const stream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: alternateFacingMode },
-            audio: false,
-          })
-
-          if (videoRef.current) {
-            videoRef.current.srcObject = stream
-            setCurrentFacingMode(alternateFacingMode)
-            console.log("Camera accessed with alternate facing mode:", alternateFacingMode)
-            setDebugInfo(`Camera accessed with alternate mode (${alternateFacingMode})`)
-          }
-        } catch (fallbackError) {
-          console.error("Both cameras failed:", fallbackError)
-          setDebugInfo("Both cameras failed, trying without constraints...")
-
-          // Try with no constraints as last resort
           const stream = await navigator.mediaDevices.getUserMedia({
             video: true,
             audio: false,
@@ -155,9 +176,12 @@ export function usePoseDetection(
 
           if (videoRef.current) {
             videoRef.current.srcObject = stream
-            console.log("Camera accessed with no facing mode constraints")
-            setDebugInfo("Camera accessed with no facing mode constraints")
+            console.log("Camera accessed with basic constraints")
+            setDebugInfo("Camera accessed with basic constraints")
           }
+        } catch (fallbackError) {
+          console.error("All camera access attempts failed:", fallbackError)
+          setDebugInfo(`CAMERA ACCESS FAILED: ${fallbackError}. Please check your camera permissions.`)
         }
       }
 
@@ -169,7 +193,9 @@ export function usePoseDetection(
                 .play()
                 .then(() => {
                   console.log("Video playback started")
-                  setDebugInfo("Video playback started")
+                  setDebugInfo(
+                    `Video playback started at ${videoRef.current?.videoWidth}x${videoRef.current?.videoHeight}`,
+                  )
                   resolve()
                 })
                 .catch((e) => {
@@ -196,43 +222,88 @@ export function usePoseDetection(
     if (!model || !videoRef.current || !canvasRef.current || !isRunningRef.current) return
 
     try {
+      // Check if video is actually playing and has dimensions
+      if (videoRef.current.videoWidth === 0 || videoRef.current.videoHeight === 0) {
+        setDebugInfo("Video dimensions are zero. Camera may not be initialized properly.")
+        requestAnimationRef.current = requestAnimationFrame(detectPose)
+        return
+      }
+
+      // Track detection attempts
+      setAttemptCount((prev) => prev + 1)
+
       // Prepare input for the model
       const video = videoRef.current
 
-      // MoveNet requires a specific input size
-      const imageTensor = tf.browser.fromPixels(video)
-      const input = tf.image.resizeBilinear(imageTensor, [192, 192])
-      const expandedInput = tf.expandDims(input, 0)
+      try {
+        // MoveNet requires a specific input size
+        const imageTensor = tf.browser.fromPixels(video)
+        const input = tf.image.resizeBilinear(imageTensor, [192, 192])
+        const expandedInput = tf.expandDims(input, 0)
 
-      // Run inference
-      const output = model.predict(expandedInput) as tf.Tensor
+        // Run inference
+        const output = model.predict(expandedInput) as tf.Tensor
 
-      // Process the output to get keypoints
-      const keypointsArray = await output.array()
-      const keypoints = keypointsArray[0][0].map((keypoint: number[], i: number) => {
-        // MoveNet returns keypoints as [y, x, score]
-        return {
-          y: keypoint[0] * video.height,
-          x: keypoint[1] * video.width,
-          score: keypoint[2],
-          name: KEYPOINT_NAMES[i],
+        // Process the output to get keypoints
+        const keypointsArray = await output.array()
+        const keypoints = keypointsArray[0][0].map((keypoint: number[], i: number) => {
+          // MoveNet returns keypoints as [y, x, score]
+          return {
+            y: keypoint[0] * video.height,
+            x: keypoint[1] * video.width,
+            score: keypoint[2],
+            name: KEYPOINT_NAMES[i],
+          }
+        })
+
+        const pose: Pose = { keypoints }
+        setDetectedPose(pose)
+
+        // Count visible keypoints
+        const visibleKeypoints = keypoints.filter((kp) => kp.score && kp.score > confidenceThreshold).length
+
+        // Add to detection history for stability
+        detectionHistoryRef.current.push(visibleKeypoints)
+        if (detectionHistoryRef.current.length > 10) {
+          detectionHistoryRef.current.shift()
         }
-      })
 
-      const pose: Pose = { keypoints }
-      setDetectedPose(pose)
+        // Use average for more stability
+        const avgVisibleKeypoints = Math.floor(
+          detectionHistoryRef.current.reduce((sum, val) => sum + val, 0) / detectionHistoryRef.current.length,
+        )
 
-      // Draw the pose
-      drawPose(pose)
+        // Update detection status
+        if (avgVisibleKeypoints >= 10) {
+          setDetectionStatus("good")
+          setDebugInfo(`Detection good: ${avgVisibleKeypoints} keypoints visible`)
+        } else if (avgVisibleKeypoints >= 5) {
+          setDetectionStatus("partial")
+          setDebugInfo(`Detection partial: ${avgVisibleKeypoints} keypoints visible`)
+        } else {
+          setDetectionStatus("none")
+          setDebugInfo(
+            `Detection poor: only ${avgVisibleKeypoints} keypoints visible. Try adjusting lighting or position.`,
+          )
+        }
 
-      // Process exercise based on pose
-      processExercise(pose)
+        // Draw the pose
+        drawPose(pose)
 
-      // Clean up tensors to prevent memory leaks
-      imageTensor.dispose()
-      input.dispose()
-      expandedInput.dispose()
-      output.dispose()
+        // Process exercise based on pose if we have enough keypoints
+        if (avgVisibleKeypoints >= 5) {
+          processExercise(pose)
+        }
+
+        // Clean up tensors to prevent memory leaks
+        imageTensor.dispose()
+        input.dispose()
+        expandedInput.dispose()
+        output.dispose()
+      } catch (error) {
+        console.error("Error during pose inference:", error)
+        setDebugInfo(`Error during pose inference: ${error}`)
+      }
     } catch (error) {
       console.error("Error during pose detection:", error)
       setDebugInfo(`Error during pose detection: ${error}`)
@@ -326,7 +397,7 @@ export function usePoseDetection(
 
       lastAngleRef.current = angle
     } else {
-      setDebugInfo("Leg keypoints not visible enough. Try adjusting your position.")
+      setDebugInfo("Leg keypoints not visible enough. Try adjusting your position or lighting.")
     }
   }
 
@@ -404,7 +475,7 @@ export function usePoseDetection(
 
       lastAngleRef.current = angle
     } else {
-      setDebugInfo("Arm keypoints not visible enough. Try adjusting your position.")
+      setDebugInfo("Arm keypoints not visible enough. Try adjusting your position or lighting.")
     }
   }
 
@@ -476,15 +547,18 @@ export function usePoseDetection(
   // Draw pose on canvas
   function drawPose(pose: Pose) {
     const ctx = canvasRef.current?.getContext("2d")
-    if (!ctx || !canvasRef.current) return
+    if (!ctx || !canvasRef.current || !videoRef.current) return
 
     // Clear canvas
     ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height)
 
     // Set canvas dimensions to match video
-    if (videoRef.current) {
+    if (videoRef.current.videoWidth && videoRef.current.videoHeight) {
       canvasRef.current.width = videoRef.current.videoWidth
       canvasRef.current.height = videoRef.current.videoHeight
+    } else {
+      canvasRef.current.width = videoRef.current.offsetWidth
+      canvasRef.current.height = videoRef.current.offsetHeight
     }
 
     // Draw keypoints
@@ -493,13 +567,21 @@ export function usePoseDetection(
         if (keypoint.score && keypoint.score > confidenceThreshold) {
           ctx.beginPath()
           ctx.arc(keypoint.x, keypoint.y, 8, 0, 2 * Math.PI)
-          ctx.fillStyle = "#10b981" // Green color
+
+          // Color code by confidence
+          const alpha = Math.min(1, keypoint.score * 2)
+          ctx.fillStyle = `rgba(16, 185, 129, ${alpha})`
           ctx.fill()
 
           // Add keypoint name for debugging
           ctx.fillStyle = "white"
           ctx.font = "12px Arial"
           ctx.fillText(keypoint.name || "", keypoint.x + 10, keypoint.y)
+
+          // Add confidence score
+          ctx.fillStyle = "yellow"
+          ctx.font = "10px Arial"
+          ctx.fillText(`${(keypoint.score * 100).toFixed(0)}%`, keypoint.x + 10, keypoint.y + 12)
         }
       })
 
@@ -545,11 +627,15 @@ export function usePoseDetection(
         start.score > confidenceThreshold &&
         end.score > confidenceThreshold
       ) {
+        // Calculate average confidence for this connection
+        const avgConfidence = (start.score + end.score) / 2
+        const alpha = Math.min(1, avgConfidence * 2)
+
         ctx.beginPath()
         ctx.moveTo(start.x, start.y)
         ctx.lineTo(end.x, end.y)
         ctx.lineWidth = 4
-        ctx.strokeStyle = "#10b981" // Green color
+        ctx.strokeStyle = `rgba(16, 185, 129, ${alpha})`
         ctx.stroke()
       }
     })
@@ -565,13 +651,19 @@ export function usePoseDetection(
 
     if (videoRef.current && canvasRef.current) {
       // Set canvas size initially
-      canvasRef.current.width = videoRef.current.videoWidth || 640
-      canvasRef.current.height = videoRef.current.videoHeight || 480
+      if (videoRef.current.videoWidth && videoRef.current.videoHeight) {
+        canvasRef.current.width = videoRef.current.videoWidth
+        canvasRef.current.height = videoRef.current.videoHeight
+      } else {
+        canvasRef.current.width = videoRef.current.offsetWidth
+        canvasRef.current.height = videoRef.current.offsetHeight
+      }
 
       // Reset exercise state
       lastExerciseStateRef.current = "unknown"
       repInProgressRef.current = false
       angleHistoryRef.current = []
+      detectionHistoryRef.current = []
 
       // Start detection loop
       isRunningRef.current = true
@@ -629,5 +721,7 @@ export function usePoseDetection(
     startPoseDetection,
     stopPoseDetection,
     debugInfo,
+    detectionStatus,
+    forceDectection,
   }
 }
